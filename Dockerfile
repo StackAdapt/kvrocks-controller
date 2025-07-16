@@ -37,7 +37,7 @@ COPY --from=build /kvctl/_build/kvctl ./bin/
 VOLUME /var/lib/kvctl
 
 COPY ./LICENSE ./NOTICE ./licenses ./
-COPY ./config/config.yaml /var/lib/kvctl/
+COPY ./config/* /var/lib/kvctl/
 
 EXPOSE 9379:9379
 ENTRYPOINT ["./bin/kvctl-server", "-c", "/var/lib/kvctl/config.yaml"]
