@@ -27,7 +27,7 @@ storage_type: consul
 
 consul:
   addrs:
-    - "127.0.0.1:8500"
+    - "consul0:8500"
   elect_path:
   tls:
     enable: false
