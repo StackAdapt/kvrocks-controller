@@ -21,14 +21,17 @@ version: "3.7"
 services:
   kvrocks0:
     build: ./kvrocks
+    networks:
+      - kvrocks-dev
     container_name: kvrocks-cluster
     ports:
       - "7770:7770"
       - "7771:7771"
 
-
   etcd0:
     image: "quay.io/coreos/etcd:v3.5.17"
+    networks:
+      - kvrocks-dev
     container_name: etcd0
     ports:
       - "2380:2380"
@@ -46,12 +49,16 @@ services:
 
   zookeeper0:
     image: "zookeeper:latest"
+    networks:
+      - kvrocks-dev
     container_name: zookeeper0
     ports:
       - "2181:2181"
 
   consul0:
     image: hashicorp/consul:latest
+    networks:
+      - kvrocks-dev
     container_name: consul0
     ports:
       - "8500:8500"
@@ -59,6 +66,8 @@ services:
 
   postgres0:
     build: ./pg-dockerfile
+    networks:
+      - kvrocks-dev
     container_name: postgres0
     environment:
       POSTGRES_USER: postgres
@@ -68,3 +77,7 @@ services:
       - "5432:5432"
     volumes:
       - ./pg-init-scripts:/docker-entrypoint-initdb.d
+
+networks:
+  kvrocks-dev:
+    external: true
