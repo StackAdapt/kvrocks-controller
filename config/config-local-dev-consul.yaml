@@ -16,7 +16,7 @@
 # under the License.
 #
 
-addr: "127.0.0.1:9379"
+addr: "0.0.0.0:9379"
 
 # Which store engine should be used by controller
 # options: etcd, zookeeper, raft, consul
@@ -27,7 +27,7 @@ storage_type: consul
 
 consul:
   addrs:
-    - "127.0.0.1:8500"
+    - "consul0:8500"
   elect_path:
   tls:
     enable: false
