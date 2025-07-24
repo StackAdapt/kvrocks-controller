@@ -34,9 +34,9 @@ import (
 )
 
 type MigrateSlotRequest struct {
-	Target   int             `json:"target" validate:"required"`
-	Slot     store.SlotRange `json:"slot" validate:"required"` // we don't use store.MigratingSlot here because we expect a valid SlotRange
-	SlotOnly bool            `json:"slot_only"`
+	Target   int              `json:"target" validate:"required"`
+	Slot     store.SlotRanges `json:"slot" validate:"required"`
+	SlotOnly bool             `json:"slot_only"`
 }
 
 type CreateClusterRequest struct {
@@ -147,7 +147,13 @@ func (handler *ClusterHandler) MigrateSlot(c *gin.Context) {
 		return
 	}
 
-	err = cluster.MigrateSlot(c, req.Slot, req.Target, req.SlotOnly)
+	// TODO: Need to modify MigrateSlot to be able to add to queue.
+	// and then use a loop and call migrateSlot multiple times depending on req.Slot
+	err = cluster.MigrateSlot(c, req.Slot[0], req.Target, req.SlotOnly)
+	if errors.Is(err, consts.ErrShardSlotIsMigrating) {
+		cluster.MigrationQueue.Enqueue(store.Migration{Target: req.Target, Slot: req.Slot[0], SlotOnly: req.SlotOnly})
+		helper.ResponseOK(c, gin.H{"cluster": cluster})
+	}
 	if err != nil {
 		helper.ResponseError(c, err)
 		return

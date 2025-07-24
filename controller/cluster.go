@@ -376,6 +376,11 @@ func (c *ClusterChecker) tryUpdateMigrationStatus(ctx context.Context, clonedClu
 				log.Info("Migrate the slot successfully", zap.String("slot", migratedSlot.String()))
 			}
 			c.updateCluster(clonedCluster)
+
+			if clonedCluster.MigrationQueue.Available() {
+				clonedCluster.MigrateNextSlots(ctx)
+				c.updateCluster(clonedCluster)
+			}
 		default:
 			clonedCluster.Shards[i].ClearMigrateState()
 			if err := c.clusterStore.SetCluster(ctx, c.namespace, clonedCluster); err != nil {

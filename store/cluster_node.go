@@ -149,6 +149,9 @@ func (n *ClusterNode) GetClient() *redis.Client {
 		}
 	}
 
+	// TODO: bseto consider making these configurable, I'm seeing a lot of errors
+	// whenever we try to update the cluster. Lots of client connection spam, could
+	// be related to the timeouts?
 	client := redis.NewClient(&redis.Options{
 		Addr:         n.addr,
 		Password:     n.password,

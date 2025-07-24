@@ -46,6 +46,9 @@ var MigrateCommand = &cobra.Command{
 	Example: `
 # Migrate slot between cluster shards 
 kvctl migrate slot <slot> --target <target_shard_index> -n <namespace> -c <cluster>
+
+# Cancel the queue for migration - does not stop the current migration
+kvctl migrate cancel -n <namespace> -c <cluster>
 `,
 	PreRunE: migrationPreRun,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -53,14 +56,21 @@ kvctl migrate slot <slot> --target <target_shard_index> -n <namespace> -c <clust
 		client := newClient(host)
 		resource := strings.ToLower(args[0])
 		switch resource {
-		case "slot":
+		case MigrateSlot:
 			return migrateSlot(client, &migrateOptions)
+		case MigrateCancel:
+			return migrateCancel(client)
 		default:
 			return fmt.Errorf("unsupported resource type: %s", resource)
 		}
 	},
 	SilenceUsage:  true,
 	SilenceErrors: true,
+}
+
+func migrateCancel(_ *client) error {
+	// TODO: STUB bseto need to add the cancel logic still
+	return nil
 }
 
 func migrationPreRun(_ *cobra.Command, args []string) error {

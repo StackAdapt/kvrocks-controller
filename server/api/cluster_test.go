@@ -131,7 +131,7 @@ func TestClusterBasics(t *testing.T) {
 		slotRange, err := store.NewSlotRange(3, 3)
 		require.NoError(t, err)
 		testMigrateReq := &MigrateSlotRequest{
-			Slot:     slotRange,
+			Slot:     store.SlotRanges{slotRange},
 			SlotOnly: true,
 			Target:   1,
 		}
@@ -234,7 +234,7 @@ func TestClusterMigrateData(t *testing.T) {
 		reqCtx := GetTestContext(recorder)
 		reqCtx.Set(consts.ContextKeyStore, handler.s)
 		reqCtx.Params = []gin.Param{{Key: "namespace", Value: ns}, {Key: "cluster", Value: cluster}}
-		body, err := json.Marshal(&MigrateSlotRequest{Target: 1, Slot: slotRange})
+		body, err := json.Marshal(&MigrateSlotRequest{Target: 1, Slot: store.SlotRanges{slotRange}})
 		require.NoError(t, err)
 		reqCtx.Request.Body = io.NopCloser(bytes.NewBuffer(body))
 

@@ -34,9 +34,44 @@ import (
 )
 
 type Cluster struct {
-	Name    string       `json:"name"`
-	Version atomic.Int64 `json:"-"`
-	Shards  []*Shard     `json:"shards"`
+	Name           string         `json:"name"`
+	Version        atomic.Int64   `json:"-"`
+	Shards         []*Shard       `json:"shards"`
+	MigrationQueue MigrationQueue `json:"-"` // just testing for now
+}
+
+type MigrationQueue struct {
+	// Migrations can be done in parallel as long as the source shard, and target shard
+	// are currently not migrating. This means we should always loop through the Data
+	// and try.
+	Data []Migration `json:"queue"`
+}
+
+type Migration struct {
+	Target   int       `json:"target"`
+	Slot     SlotRange `json:"slots"`
+	SlotOnly bool      `json:"slot_only"`
+}
+
+func (m *MigrationQueue) Enqueue(migration Migration) {
+	m.Data = append(m.Data, migration)
+}
+
+func (m *MigrationQueue) Dequeue() (Migration, bool) {
+	if len(m.Data) == 0 {
+		return Migration{}, false
+	}
+	val := m.Data[0]
+	m.Data = m.Data[1:]
+	return val, true
+}
+
+func (m *MigrationQueue) Available() bool {
+	return len(m.Data) > 0
+}
+
+func (m *MigrationQueue) Clear() {
+	m.Data = nil
 }
 
 func NewCluster(name string, nodes []string, replicas int) (*Cluster, error) {
@@ -72,7 +107,7 @@ func NewCluster(name string, nodes []string, replicas int) (*Cluster, error) {
 		shards = append(shards, shard)
 	}
 
-	cluster := &Cluster{Name: name, Shards: shards}
+	cluster := &Cluster{Name: name, Shards: shards, MigrationQueue: MigrationQueue{}}
 	cluster.Version.Store(1)
 	return cluster, nil
 }
@@ -195,6 +230,29 @@ func (cluster *Cluster) findShardIndexBySlot(slot SlotRange) (int, error) {
 	return sourceShardIdx, nil
 }
 
+func (cluster *Cluster) MigrateNextSlots(ctx context.Context) error {
+	if !cluster.MigrationQueue.Available() {
+		return consts.ErrNoMigrationsAvailable
+	}
+
+	var newQueue []Migration
+	for cluster.MigrationQueue.Available() {
+		request, ok := cluster.MigrationQueue.Dequeue()
+		if !ok {
+			break
+		}
+		err := cluster.MigrateSlot(ctx, request.Slot, request.Target, request.SlotOnly)
+		if errors.Is(err, consts.ErrShardSlotIsMigrating) {
+			newQueue = append(newQueue, request)
+		}
+	}
+
+	for i := 0; i < len(newQueue); i++ {
+		cluster.MigrationQueue.Enqueue(newQueue[i])
+	}
+	return nil
+}
+
 func (cluster *Cluster) MigrateSlot(ctx context.Context, slot SlotRange, targetShardIdx int, slotOnly bool) error {
 	if targetShardIdx < 0 || targetShardIdx >= len(cluster.Shards) {
 		return consts.ErrIndexOutOfRange
@@ -215,6 +273,7 @@ func (cluster *Cluster) MigrateSlot(ctx context.Context, slot SlotRange, targetS
 	}
 
 	if cluster.Shards[sourceShardIdx].IsMigrating() || cluster.Shards[targetShardIdx].IsMigrating() {
+		// cluster.MigrationQueue.Add(Migration{Target: targetShardIdx, Slot: slot, SlotOnly: slotOnly})
 		return consts.ErrShardSlotIsMigrating
 	}
 	// Send the migration command to the source node

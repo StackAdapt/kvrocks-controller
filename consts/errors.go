@@ -39,4 +39,5 @@ var (
 	ErrShardSlotIsMigrating             = errors.New("shard slot is migrating")
 	ErrShardNoMatchNewMaster            = errors.New("no match new master in shard")
 	ErrSlotStartAndStopEqual            = errors.New("start and stop of a range cannot be equal")
+	ErrNoMigrationsAvailable            = errors.New("no more migrations available in queue")
 )
