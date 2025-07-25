@@ -378,7 +378,8 @@ func (c *ClusterChecker) tryUpdateMigrationStatus(ctx context.Context, clonedClu
 			c.updateCluster(clonedCluster)
 
 			if clonedCluster.MigrationQueue.Available() {
-				clonedCluster.MigrateNextSlots(ctx)
+				clonedCluster.MigrateAvailableSlots(ctx)
+				c.clusterStore.SetCluster(ctx, c.namespace, clonedCluster)
 				c.updateCluster(clonedCluster)
 			}
 		default:

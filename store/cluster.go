@@ -37,7 +37,7 @@ type Cluster struct {
 	Name           string         `json:"name"`
 	Version        atomic.Int64   `json:"-"`
 	Shards         []*Shard       `json:"shards"`
-	MigrationQueue MigrationQueue `json:"-"` // just testing for now
+	MigrationQueue MigrationQueue `json:"migration_queue"`
 }
 
 type MigrationQueue struct {
@@ -230,7 +230,7 @@ func (cluster *Cluster) findShardIndexBySlot(slot SlotRange) (int, error) {
 	return sourceShardIdx, nil
 }
 
-func (cluster *Cluster) MigrateNextSlots(ctx context.Context) error {
+func (cluster *Cluster) MigrateAvailableSlots(ctx context.Context) error {
 	if !cluster.MigrationQueue.Available() {
 		return consts.ErrNoMigrationsAvailable
 	}
@@ -247,6 +247,8 @@ func (cluster *Cluster) MigrateNextSlots(ctx context.Context) error {
 		}
 	}
 
+	// any of the requests that got rejected because shard is already migrating will be put
+	// into a queue again
 	for i := 0; i < len(newQueue); i++ {
 		cluster.MigrationQueue.Enqueue(newQueue[i])
 	}
