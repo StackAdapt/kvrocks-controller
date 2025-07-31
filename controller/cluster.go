@@ -316,13 +316,7 @@ func (c *ClusterChecker) probeLoop() {
 
 func (c *ClusterChecker) updateCluster(cluster *store.Cluster) {
 	c.clusterMu.Lock()
-	log := logger.Get().With(
-		zap.String("cluster", cluster.Name))
-	oldQueue := c.cluster.MigrationQueue
-	log.Info("old queue length", zap.Int("len", len(oldQueue.Data)))
 	c.cluster = cluster
-	c.cluster.MigrationQueue = oldQueue
-	log.Info("new cluster queue length", zap.Int("len", len(c.cluster.MigrationQueue.Data)))
 	c.clusterMu.Unlock()
 }
 
