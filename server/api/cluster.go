@@ -159,10 +159,12 @@ func (handler *ClusterHandler) MigrateSlot(c *gin.Context) {
 	// and then use a loop and call migrateSlot multiple times depending on req.Slot
 	err = cluster.MigrateSlot(c, req.Slot, req.Target, req.SlotOnly)
 	if errors.Is(err, consts.ErrShardSlotIsMigrating) {
+		err = nil
 		log.Info("slot was migrating but we're going to queue it up")
 		cluster.MigrationQueue.Enqueue(store.Migration{Target: req.Target, Slot: req.Slot, SlotOnly: req.SlotOnly})
-		helper.ResponseOK(c, gin.H{"cluster": cluster})
+		// helper.ResponseOK(c, gin.H{"cluster": cluster})
 	}
+
 	if err != nil {
 		helper.ResponseError(c, err)
 		return
@@ -171,7 +173,7 @@ func (handler *ClusterHandler) MigrateSlot(c *gin.Context) {
 	if req.SlotOnly {
 		err = handler.s.UpdateCluster(c, namespace, cluster)
 	} else {
-		// The version should be increased after the slot migration is done
+		log.Info("setting cluster from MigrateSlot call")
 		err = handler.s.SetCluster(c, namespace, cluster)
 	}
 	if err != nil {

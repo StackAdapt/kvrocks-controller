@@ -24,9 +24,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
+
 	"github.com/apache/kvrocks-controller/logger"
 	"go.uber.org/zap"
-	"sync"
 
 	"github.com/apache/kvrocks-controller/consts"
 	"github.com/apache/kvrocks-controller/store/engine"
@@ -186,6 +187,9 @@ func (s *ClusterStore) UpdateCluster(ctx context.Context, ns string, clusterInfo
 		return fmt.Errorf("the cluster has been updated by others")
 	}
 
+	// We want the most up to date queue
+	clusterInfo.MigrationQueue = oldCluster.MigrationQueue
+
 	clusterInfo.Version.Add(1)
 	clusterBytes, err := json.Marshal(clusterInfo)
 	if err != nil {
@@ -207,6 +211,9 @@ func (s *ClusterStore) UpdateCluster(ctx context.Context, ns string, clusterInfo
 
 // SetCluster set the cluster to store under the specified namespace but won't increase the version.
 func (s *ClusterStore) SetCluster(ctx context.Context, ns string, clusterInfo *Cluster) error {
+	log := logger.Get().With(
+		zap.String("inside", "hello"))
+	log.Info("setting cluster")
 	lock := s.getLock(ns, clusterInfo.Name)
 	lock.Lock()
 	defer lock.Unlock()

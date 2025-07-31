@@ -316,7 +316,13 @@ func (c *ClusterChecker) probeLoop() {
 
 func (c *ClusterChecker) updateCluster(cluster *store.Cluster) {
 	c.clusterMu.Lock()
+	log := logger.Get().With(
+		zap.String("cluster", cluster.Name))
+	oldQueue := c.cluster.MigrationQueue
+	log.Info("old queue length", zap.Int("len", len(oldQueue.Data)))
 	c.cluster = cluster
+	c.cluster.MigrationQueue = oldQueue
+	log.Info("new cluster queue length", zap.Int("len", len(c.cluster.MigrationQueue.Data)))
 	c.clusterMu.Unlock()
 }
 
@@ -364,6 +370,7 @@ func (c *ClusterChecker) tryUpdateMigrationStatus(ctx context.Context, clonedClu
 			c.updateCluster(clonedCluster)
 			log.Warn("Failed to migrate the slot", zap.String("slot", migratingSlot.String()))
 		case "success":
+			log.Info("successful migration of slot", zap.String("debug", "byron"))
 			clonedCluster.Shards[i].SlotRanges = store.RemoveSlotFromSlotRanges(clonedCluster.Shards[i].SlotRanges, shard.MigratingSlot.SlotRange)
 			clonedCluster.Shards[shard.TargetShardIndex].SlotRanges = store.AddSlotToSlotRanges(
 				clonedCluster.Shards[shard.TargetShardIndex].SlotRanges, shard.MigratingSlot.SlotRange,
@@ -377,10 +384,18 @@ func (c *ClusterChecker) tryUpdateMigrationStatus(ctx context.Context, clonedClu
 			}
 			c.updateCluster(clonedCluster)
 
+			log.Info("checking if migration queue is available", zap.String("debug", "byron"))
 			if clonedCluster.MigrationQueue.Available() {
-				clonedCluster.MigrateAvailableSlots(ctx)
+				log.Info("should be available, should trigger some more? ", zap.String("debug", "byron"))
+				err = clonedCluster.MigrateAvailableSlots(ctx)
+				if err != nil {
+					log.Error("not available?", zap.Error(err))
+					continue
+				}
 				c.clusterStore.SetCluster(ctx, c.namespace, clonedCluster)
 				c.updateCluster(clonedCluster)
+			} else {
+				log.Info("not available", zap.String("debug", "byron"))
 			}
 		default:
 			clonedCluster.Shards[i].ClearMigrateState()

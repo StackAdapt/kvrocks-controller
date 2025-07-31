@@ -31,6 +31,8 @@ import (
 	"sync/atomic"
 
 	"github.com/apache/kvrocks-controller/consts"
+	"github.com/apache/kvrocks-controller/logger"
+	"go.uber.org/zap"
 )
 
 type Cluster struct {
@@ -67,6 +69,8 @@ func (m *MigrationQueue) Dequeue() (Migration, bool) {
 }
 
 func (m *MigrationQueue) Available() bool {
+	log := logger.Get()
+	log.Info("length", zap.Int("len", len(m.Data)))
 	return len(m.Data) > 0
 }
 
