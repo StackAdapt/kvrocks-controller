@@ -22,11 +22,11 @@ package store
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/apache/kvrocks-controller/consts"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCluster_Clone(t *testing.T) {
@@ -105,4 +105,47 @@ func TestCluster_PromoteNewMaster(t *testing.T) {
 	newMasterID, err = cluster.PromoteNewMaster(ctx, 0, node3.ID(), node2.ID())
 	require.NoError(t, err)
 	require.Equal(t, node2.ID(), newMasterID)
+}
+
+func TestMigrationQueue_Dequeue(t *testing.T) {
+	type fields struct {
+		Data []Migration
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   Migration
+		ok     bool
+	}{
+		{
+			name: "single item dequeue",
+			fields: fields{
+				Data: []Migration{{Target: 1}},
+			},
+			want: Migration{Target: 1},
+			ok:   true,
+		},
+		{
+			name: "empty dequeue",
+			fields: fields{
+				Data: []Migration{},
+			},
+			want: Migration{},
+			ok:   false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := &MigrationQueue{
+				Data: tt.fields.Data,
+			}
+			got, ok := m.Dequeue()
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("MigrationQueue.Dequeue() got = %v, want %v", got, tt.want)
+			}
+			if ok != tt.ok {
+				t.Errorf("MigrationQueue.Dequeue() got1 = %v, want %v", ok, tt.ok)
+			}
+		})
+	}
 }

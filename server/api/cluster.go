@@ -155,16 +155,7 @@ func (handler *ClusterHandler) MigrateSlot(c *gin.Context) {
 		zap.String("cluster", cluster.Name))
 
 	log.Info("migrate slot!")
-	// TODO: Need to modify MigrateSlot to be able to add to queue.
-	// and then use a loop and call migrateSlot multiple times depending on req.Slot
 	err = cluster.MigrateSlot(c, req.Slot, req.Target, req.SlotOnly)
-	if errors.Is(err, consts.ErrShardSlotIsMigrating) {
-		err = nil
-		log.Info("slot was migrating but we're going to queue it up")
-		cluster.MigrationQueue.Enqueue(store.Migration{Target: req.Target, Slot: req.Slot, SlotOnly: req.SlotOnly})
-		// helper.ResponseOK(c, gin.H{"cluster": cluster})
-	}
-
 	if err != nil {
 		helper.ResponseError(c, err)
 		return
