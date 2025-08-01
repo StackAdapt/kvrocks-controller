@@ -252,7 +252,7 @@ func (cluster *Cluster) MigrateAvailableSlots(ctx context.Context) error {
 	queueCopy := cluster.MigrationQueue.Clone().Data
 	cluster.MigrationQueue.Clear()
 	for _, request := range queueCopy {
-		log.Info("dequeue", zap.String("request", request.Slot.String()))
+		log.Info("migrating", zap.String("request", request.Slot.String()))
 		err := cluster.MigrateSlot(ctx, request.Slot, request.Target, request.SlotOnly)
 		if err != nil {
 			return err
