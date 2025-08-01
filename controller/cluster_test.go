@@ -207,34 +207,34 @@ func TestCluster_LoadAndProbe(t *testing.T) {
 	}
 }
 
-// func TestCluster_MigrateSlot(t *testing.T) {
-// 	ctx := context.Background()
-// 	ns := "test-ns"
-// 	clusterName := "test-clusterProbe"
-// 	cluster, err := store.NewCluster(clusterName, []string{"127.0.0.1:7770", "127.0.0.1:7771"}, 1)
-// 	require.NoError(t, err)
-//
-// 	require.NoError(t, cluster.Reset(ctx))
-// 	require.NoError(t, cluster.SyncToNodes(ctx))
-// 	defer func() {
-// 		require.NoError(t, cluster.Reset(ctx))
-// 	}()
-// 	slotRange, err := store.NewSlotRange(0, 0)
-// 	require.NoError(t, err)
-// 	require.NoError(t, cluster.MigrateSlot(ctx, slotRange, 1, false))
-//
-// 	s := NewMockClusterStore()
-// 	require.NoError(t, s.CreateCluster(ctx, ns, cluster))
-//
-// 	clusterProbe := NewClusterChecker(s, ns, clusterName)
-// 	clusterProbe.WithPingInterval(100 * time.Millisecond)
-// 	clusterProbe.Start()
-// 	defer clusterProbe.Close()
-//
-// 	ticker := time.NewTicker(2000 * time.Millisecond)
-// 	defer ticker.Stop()
-// 	<-ticker.C
-// }
+func TestCluster_MigrateSlot(t *testing.T) {
+	ctx := context.Background()
+	ns := "test-ns"
+	clusterName := "test-clusterProbe"
+	cluster, err := store.NewCluster(clusterName, []string{"127.0.0.1:7770", "127.0.0.1:7771"}, 1)
+	require.NoError(t, err)
+
+	require.NoError(t, cluster.Reset(ctx))
+	require.NoError(t, cluster.SyncToNodes(ctx))
+	defer func() {
+		require.NoError(t, cluster.Reset(ctx))
+	}()
+	slotRange, err := store.NewSlotRange(0, 0)
+	require.NoError(t, err)
+	require.NoError(t, cluster.MigrateSlot(ctx, slotRange, 1, false))
+
+	s := NewMockClusterStore()
+	require.NoError(t, s.CreateCluster(ctx, ns, cluster))
+
+	clusterProbe := NewClusterChecker(s, ns, clusterName)
+	clusterProbe.WithPingInterval(100 * time.Millisecond)
+	clusterProbe.Start()
+	defer clusterProbe.Close()
+
+	ticker := time.NewTicker(2000 * time.Millisecond)
+	defer ticker.Stop()
+	<-ticker.C
+}
 
 func TestCluster_MigrateQueuedSlot(t *testing.T) {
 	ctx := context.Background()
