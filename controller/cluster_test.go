@@ -241,7 +241,6 @@ func TestCluster_MigrateQueuedSlot(t *testing.T) {
 	ns := "test-ns"
 	clusterName := "test-clusterProbe"
 	nodes := []string{"127.0.0.1:7770", "127.0.0.1:7771", "127.0.0.1:7772", "127.0.0.1:7773"}
-	// nodes := []string{"127.0.0.1:7770", "127.0.0.1:7771"}
 	cluster, err := store.NewCluster(clusterName, nodes, 1)
 	require.NoError(t, err)
 
@@ -250,16 +249,20 @@ func TestCluster_MigrateQueuedSlot(t *testing.T) {
 	defer func() {
 		require.NoError(t, cluster.Reset(ctx))
 	}()
+
+	// migrate slots from shard 0 to shard 2
 	slotRange, err := store.NewSlotRange(1, 1)
 	require.NoError(t, err)
 	require.NoError(t, cluster.MigrateSlot(ctx, slotRange, 2, false))
-	slotRange, err = store.NewSlotRange(4097, 4097)
-	require.NoError(t, err)
-	require.NoError(t, cluster.MigrateSlot(ctx, slotRange, 3, false))
 	slotRange, err = store.NewSlotRange(2, 2)
 	require.NoError(t, err)
 	require.NoError(t, cluster.MigrateSlot(ctx, slotRange, 2, false))
-	slotRange, err = store.NewSlotRange(4098, 4098)
+
+	// migrate slots from shard 1 to shard 3
+	slotRange, err = store.NewSlotRange(4096, 4096)
+	require.NoError(t, err)
+	require.NoError(t, cluster.MigrateSlot(ctx, slotRange, 3, false))
+	slotRange, err = store.NewSlotRange(4097, 4097)
 	require.NoError(t, err)
 	require.NoError(t, cluster.MigrateSlot(ctx, slotRange, 3, false))
 
@@ -276,7 +279,7 @@ func TestCluster_MigrateQueuedSlot(t *testing.T) {
 	clusterProbe.Start()
 	defer clusterProbe.Close()
 
-	ticker := time.NewTicker(4000 * time.Millisecond)
+	ticker := time.NewTicker(6000 * time.Millisecond)
 	defer ticker.Stop()
 	<-ticker.C
 	cluster, err = s.GetCluster(ctx, ns, clusterName)
@@ -292,7 +295,7 @@ func TestCluster_MigrateQueuedSlot(t *testing.T) {
 	require.Equal(t, expectedSlotRanges, cluster.Shards[2].SlotRanges)
 
 	// we expect slots 4097, and 4098 on shard 3 from shard 1
-	expectedSlotRange1, err = store.NewSlotRange(4097, 4098)
+	expectedSlotRange1, err = store.NewSlotRange(4096, 4097)
 	require.NoError(t, err)
 	expectedSlotRange2, err = store.NewSlotRange(12288, 16383)
 	require.NoError(t, err)
