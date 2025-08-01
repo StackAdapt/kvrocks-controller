@@ -250,19 +250,19 @@ func TestCluster_MigrateQueuedSlot(t *testing.T) {
 		require.NoError(t, cluster.Reset(ctx))
 	}()
 
-	// migrate slots from shard 0 to shard 2
+	// migrate slots from shard 0 to shard 1
 	slotRange1, err := store.NewSlotRange(1, 1)
 	require.NoError(t, err)
-	require.NoError(t, cluster.MigrateSlot(ctx, slotRange1, 2, false))
+	require.NoError(t, cluster.MigrateSlot(ctx, slotRange1, 1, false))
 	slotRange2, err := store.NewSlotRange(2, 2)
 	require.NoError(t, err)
-	require.NoError(t, cluster.MigrateSlot(ctx, slotRange2, 2, false))
+	require.NoError(t, cluster.MigrateSlot(ctx, slotRange2, 1, false))
 
-	// migrate slots from shard 1 to shard 3
-	slotRange3, err := store.NewSlotRange(4097, 4097)
+	// migrate slots from shard 2 to shard 3
+	slotRange3, err := store.NewSlotRange(8192, 8192)
 	require.NoError(t, err)
 	require.NoError(t, cluster.MigrateSlot(ctx, slotRange3, 3, false))
-	slotRange4, err := store.NewSlotRange(4098, 4098)
+	slotRange4, err := store.NewSlotRange(8193, 8193)
 	require.NoError(t, err)
 	require.NoError(t, cluster.MigrateSlot(ctx, slotRange4, 3, false))
 
@@ -289,13 +289,13 @@ func TestCluster_MigrateQueuedSlot(t *testing.T) {
 	// we expect slots 1, and 2 on shard 2, from shard 0
 	expectedSlotRange1, err := store.NewSlotRange(1, 2)
 	require.NoError(t, err)
-	expectedSlotRange2, err := store.NewSlotRange(8192, 12287)
+	expectedSlotRange2, err := store.NewSlotRange(4096, 8191)
 	require.NoError(t, err)
 	expectedSlotRanges := []store.SlotRange{expectedSlotRange1, expectedSlotRange2}
-	require.Equal(t, expectedSlotRanges, cluster.Shards[2].SlotRanges)
+	require.Equal(t, expectedSlotRanges, cluster.Shards[1].SlotRanges)
 
 	// we expect slots 4097, and 4098 on shard 3 from shard 1
-	expectedSlotRange1, err = store.NewSlotRange(4097, 4098)
+	expectedSlotRange1, err = store.NewSlotRange(8192, 8193)
 	require.NoError(t, err)
 	expectedSlotRange2, err = store.NewSlotRange(12288, 16383)
 	require.NoError(t, err)
