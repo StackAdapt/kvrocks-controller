@@ -242,23 +242,17 @@ func (cluster *Cluster) findShardIndexBySlot(slot SlotRange) (int, error) {
 }
 
 func (cluster *Cluster) MigrateAvailableSlots(ctx context.Context) error {
-	log := logger.Get()
-	log.Info("about to migrate available slots")
 	if !cluster.MigrationQueue.Available() {
 		return consts.ErrNoMigrationsAvailable
 	}
-
-	log.Info("about to go through the loop")
 	queueCopy := cluster.MigrationQueue.Clone().Data
 	cluster.MigrationQueue.Clear()
 	for _, request := range queueCopy {
-		log.Info("migrating", zap.String("request", request.Slot.String()))
 		err := cluster.MigrateSlot(ctx, request.Slot, request.Target, request.SlotOnly)
 		if err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 

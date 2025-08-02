@@ -378,7 +378,7 @@ func (c *ClusterChecker) tryUpdateMigrationStatus(ctx context.Context, clonedClu
 			}
 			c.updateCluster(clonedCluster)
 
-			log.Info("checking if migration queue is available", zap.String("debug", "byron"))
+			log.Info("Check if migration queue is available")
 			if clonedCluster.MigrationQueue.Available() {
 				log.Info("should be available, should trigger some more? ", zap.String("debug", "byron"))
 				err = clonedCluster.MigrateAvailableSlots(ctx)
