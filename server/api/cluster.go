@@ -128,6 +128,28 @@ func (handler *ClusterHandler) Remove(c *gin.Context) {
 	helper.ResponseNoContent(c)
 }
 
+func (handler *ClusterHandler) DeleteMigrateQueue(c *gin.Context) {
+	namespace := c.Param("namespace")
+	clusterName := c.Param("cluster")
+	log := logger.Get().With(
+		zap.String("namespace", namespace),
+		zap.String("cluster", clusterName))
+	log.Info("deleting migration queue")
+
+	lock := handler.getLock(namespace, clusterName)
+	lock.Lock()
+	defer lock.Unlock()
+
+	s, _ := c.MustGet(consts.ContextKeyStore).(*store.ClusterStore)
+	cluster, err := s.GetCluster(c, namespace, clusterName)
+	if err != nil {
+		helper.ResponseError(c, err)
+		return
+	}
+	cluster.MigrationQueue.Clear()
+	helper.ResponseOK(c, gin.H{"cluster": cluster})
+}
+
 func (handler *ClusterHandler) MigrateSlot(c *gin.Context) {
 	namespace := c.Param("namespace")
 	clusterName := c.Param("cluster")

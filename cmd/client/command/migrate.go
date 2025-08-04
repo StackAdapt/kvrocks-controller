@@ -59,7 +59,7 @@ kvctl migrate cancel -n <namespace> -c <cluster>
 		case MigrateSlot:
 			return migrateSlot(client, &migrateOptions)
 		case MigrateCancel:
-			return migrateCancel(client)
+			return migrateCancel(client, &migrateOptions)
 		default:
 			return fmt.Errorf("unsupported resource type: %s", resource)
 		}
@@ -68,8 +68,23 @@ kvctl migrate cancel -n <namespace> -c <cluster>
 	SilenceErrors: true,
 }
 
-func migrateCancel(_ *client) error {
-	// TODO: STUB bseto need to add the cancel logic still
+func migrateCancel(client *client, options *MigrationOptions) error {
+	rsp, err := client.restyCli.R().
+		SetPathParam("namespace", options.namespace).
+		SetPathParam("cluster", options.cluster).
+		SetBody(map[string]interface{}{
+			"slot":     options.slot,
+			"target":   options.target,
+			"slotOnly": strconv.FormatBool(options.slotOnly),
+		}).
+		Delete("/namespaces/{namespace}/clusters/{cluster}/migrate")
+	if err != nil {
+		return err
+	}
+	if rsp.IsError() {
+		return errors.New(rsp.String())
+	}
+	printLine("migrate slot[%s] task is submitted successfully.", options.slot)
 	return nil
 }
 
