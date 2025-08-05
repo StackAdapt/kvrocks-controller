@@ -147,6 +147,11 @@ func (handler *ClusterHandler) DeleteMigrateQueue(c *gin.Context) {
 		return
 	}
 	cluster.MigrationQueue.Clear()
+	err = s.SetCluster(c, namespace, cluster)
+	if err != nil {
+		helper.ResponseError(c, err)
+		return
+	}
 	helper.ResponseOK(c, gin.H{"cluster": cluster})
 }
 
