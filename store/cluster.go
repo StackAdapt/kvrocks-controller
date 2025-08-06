@@ -276,9 +276,9 @@ func (cluster *Cluster) MigrateSlot(ctx context.Context, slot SlotRange, targetS
 		return nil
 	}
 
-	if cluster.Shards[sourceShardIdx].IsMigrating() || cluster.Shards[targetShardIdx].IsMigrating() {
+	if !cluster.CanMigrate(sourceShardIdx, targetShardIdx) {
 		log.Info(
-			"source or target shard is migrating, queueing up",
+			"source or target shard is already involved in a migration, queueing up a migration",
 			zap.String("slot", slot.String()),
 			zap.Int("source", sourceShardIdx),
 			zap.Int("target", targetShardIdx),
@@ -300,6 +300,22 @@ func (cluster *Cluster) MigrateSlot(ctx context.Context, slot SlotRange, targetS
 	cluster.Shards[sourceShardIdx].MigratingSlot = FromSlotRange(slot)
 	cluster.Shards[sourceShardIdx].TargetShardIndex = targetShardIdx
 	return nil
+}
+
+func (cluster *Cluster) CanMigrate(sourceIdx, targetIdx int) bool {
+	// need to check if source or target is already migrating
+	if cluster.Shards[sourceIdx].IsMigrating() || cluster.Shards[targetIdx].IsMigrating() {
+		return false
+	}
+
+	// also need to check if anything is migrating to the source, or the target too
+	for _, shard := range cluster.Shards {
+		if shard.TargetShardIndex == sourceIdx || shard.TargetShardIndex == targetIdx {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (cluster *Cluster) SetSlot(ctx context.Context, slot int, targetNodeID string) error {
