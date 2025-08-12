@@ -28,6 +28,6 @@ const (
 )
 
 const (
-	MigrateSlot   = "slot"
-	MigrateCancel = "cancel"
+	MigrateSlot  = "slot"
+	MigrateClear = "clear"
 )

@@ -47,8 +47,8 @@ var MigrateCommand = &cobra.Command{
 # Migrate slot between cluster shards 
 kvctl migrate slot <slot> --target <target_shard_index> -n <namespace> -c <cluster>
 
-# Cancel the queue for migration - does not stop the current migration
-kvctl migrate cancel -n <namespace> -c <cluster>
+# Clear the queue for migration - does not stop the current migration
+kvctl migrate clear -n <namespace> -c <cluster>
 `,
 	PreRunE: migrationPreRun,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -58,8 +58,8 @@ kvctl migrate cancel -n <namespace> -c <cluster>
 		switch resource {
 		case MigrateSlot:
 			return migrateSlot(client, &migrateOptions)
-		case MigrateCancel:
-			return migrateCancel(client, &migrateOptions)
+		case MigrateClear:
+			return migrateClear(client, &migrateOptions)
 		default:
 			return fmt.Errorf("unsupported resource type: %s", resource)
 		}
@@ -68,7 +68,7 @@ kvctl migrate cancel -n <namespace> -c <cluster>
 	SilenceErrors: true,
 }
 
-func migrateCancel(client *client, options *MigrationOptions) error {
+func migrateClear(client *client, options *MigrationOptions) error {
 	rsp, err := client.restyCli.R().
 		SetPathParam("namespace", options.namespace).
 		SetPathParam("cluster", options.cluster).
@@ -99,8 +99,8 @@ func migrationPreRun(_ *cobra.Command, args []string) error {
 	if migrateOptions.cluster == "" {
 		return fmt.Errorf("cluster is required, please specify with -c or --cluster")
 	}
-	// for migrate cancel, we only need namespace and cluster
-	if resource == MigrateCancel {
+	// for migrate clear, we only need namespace and cluster
+	if resource == MigrateClear {
 		return nil
 	}
 	if len(args) < 2 {
