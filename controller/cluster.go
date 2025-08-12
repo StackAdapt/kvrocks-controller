@@ -22,6 +22,7 @@ package controller
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -30,7 +31,6 @@ import (
 
 	"github.com/apache/kvrocks-controller/logger"
 	"github.com/apache/kvrocks-controller/store"
-	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -74,7 +74,7 @@ type HookParams struct {
 	clusterName  string
 }
 
-type Hook func(context.Context, HookParams) error
+type Hook func(context.Context, *HookParams) error
 
 func NewClusterChecker(s store.Store, ns, cluster string) *ClusterChecker {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -93,6 +93,7 @@ func NewClusterChecker(s store.Store, ns, cluster string) *ClusterChecker {
 		ctx:      ctx,
 		cancelFn: cancel,
 	}
+	c.AddStartHook(InitializeClusterInfo()) // needs to be first
 	c.AddStartHook(MigrateAvailableSlots())
 	return c
 }
@@ -106,15 +107,25 @@ func (c *ClusterChecker) Start() {
 	go c.migrationLoop()
 }
 
+func InitializeClusterInfo() Hook {
+	return func(ctx context.Context, params *HookParams) error {
+		clusterInfo, err := params.clusterStore.GetCluster(ctx, params.namespace, params.clusterName)
+		if err != nil {
+			return fmt.Errorf("failed to get the clusterName info from the clusterStore: %w", err)
+		}
+		params.cluster = clusterInfo
+		return nil
+	}
+}
+
 func MigrateAvailableSlots() Hook {
-	return func(ctx context.Context, params HookParams) error {
+	return func(ctx context.Context, params *HookParams) error {
 		if params.cluster.MigrationQueue.Available() {
 			err := params.cluster.MigrateAvailableSlots(ctx)
 			if err != nil {
 				return err
 			}
 			if err := params.clusterStore.SetCluster(ctx, params.namespace, params.cluster); err != nil {
-				log.Error("Failed to update the cluster", zap.Error(err))
 				return err
 			}
 		}
@@ -132,10 +143,11 @@ func (c *ClusterChecker) triggerStartHooks() {
 		zap.String("cluster", c.clusterName))
 	c.clusterMu.Lock()
 	defer c.clusterMu.Unlock()
-	params := HookParams{
+
+	params := &HookParams{
 		options:      c.options,
 		clusterStore: c.clusterStore,
-		cluster:      c.cluster.Clone(),
+		cluster:      c.cluster, // we have the clusterMu lock, so it's ok that hooks can access this cluster var directly
 		namespace:    c.namespace,
 		clusterName:  c.clusterName,
 	}
@@ -145,9 +157,6 @@ func (c *ClusterChecker) triggerStartHooks() {
 			log.Error("start hook", zap.Error(err))
 		}
 	}
-
-	// we're already holding the lock, so we can update c.cluster
-	c.cluster = params.cluster
 }
 
 func (c *ClusterChecker) WithPingInterval(interval time.Duration) *ClusterChecker {
