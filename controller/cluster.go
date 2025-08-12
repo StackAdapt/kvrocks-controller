@@ -30,6 +30,7 @@ import (
 
 	"github.com/apache/kvrocks-controller/logger"
 	"github.com/apache/kvrocks-controller/store"
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -58,8 +59,22 @@ type ClusterChecker struct {
 	ctx      context.Context
 	cancelFn context.CancelFunc
 
+	startHooks []Hook
+
 	wg sync.WaitGroup
 }
+
+// HookParams, any writes/updates to the `cluster` variable will automatically
+// be saved to the ClusterChecker after all the hooks are run
+type HookParams struct {
+	options      ClusterCheckOptions
+	clusterStore store.Store
+	cluster      *store.Cluster
+	namespace    string
+	clusterName  string
+}
+
+type Hook func(context.Context, HookParams) error
 
 func NewClusterChecker(s store.Store, ns, cluster string) *ClusterChecker {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -78,14 +93,61 @@ func NewClusterChecker(s store.Store, ns, cluster string) *ClusterChecker {
 		ctx:      ctx,
 		cancelFn: cancel,
 	}
+	c.AddStartHook(MigrateAvailableSlots())
 	return c
 }
 
 func (c *ClusterChecker) Start() {
+	c.triggerStartHooks()
+
 	c.wg.Add(1)
 	go c.probeLoop()
 	c.wg.Add(1)
 	go c.migrationLoop()
+}
+
+func MigrateAvailableSlots() Hook {
+	return func(ctx context.Context, params HookParams) error {
+		if params.cluster.MigrationQueue.Available() {
+			err := params.cluster.MigrateAvailableSlots(ctx)
+			if err != nil {
+				return err
+			}
+			if err := params.clusterStore.SetCluster(ctx, params.namespace, params.cluster); err != nil {
+				log.Error("Failed to update the cluster", zap.Error(err))
+				return err
+			}
+		}
+		return nil
+	}
+}
+
+func (c *ClusterChecker) AddStartHook(hooks ...Hook) {
+	c.startHooks = append(c.startHooks, hooks...)
+}
+
+func (c *ClusterChecker) triggerStartHooks() {
+	log := logger.Get().With(
+		zap.String("namespace", c.namespace),
+		zap.String("cluster", c.clusterName))
+	c.clusterMu.Lock()
+	defer c.clusterMu.Unlock()
+	params := HookParams{
+		options:      c.options,
+		clusterStore: c.clusterStore,
+		cluster:      c.cluster.Clone(),
+		namespace:    c.namespace,
+		clusterName:  c.clusterName,
+	}
+	for _, hook := range c.startHooks {
+		err := hook(c.ctx, params)
+		if err != nil {
+			log.Error("start hook", zap.Error(err))
+		}
+	}
+
+	// we're already holding the lock, so we can update c.cluster
+	c.cluster = params.cluster
 }
 
 func (c *ClusterChecker) WithPingInterval(interval time.Duration) *ClusterChecker {
