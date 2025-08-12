@@ -93,7 +93,7 @@ func NewClusterChecker(s store.Store, ns, cluster string) *ClusterChecker {
 		ctx:      ctx,
 		cancelFn: cancel,
 	}
-	c.AddStartHook(InitializeClusterInfo()) // needs to be first
+	c.AddStartHook(InitializeClusterInfo()) // needs to be first to initialize cluster info
 	c.AddStartHook(MigrateAvailableSlots())
 	return c
 }
