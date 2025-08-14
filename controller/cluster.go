@@ -391,10 +391,6 @@ func (c *ClusterChecker) updateCluster(cluster *store.Cluster) {
 	c.clusterMu.Unlock()
 }
 
-func (c *ClusterChecker) updateClusterNoLock(cluster *store.Cluster) {
-	c.cluster = cluster
-}
-
 func (c *ClusterChecker) tryUpdateMigrationStatus(ctx context.Context, clonedCluster *store.Cluster) {
 	log := logger.Get().With(
 		zap.String("namespace", c.namespace),
@@ -436,7 +432,7 @@ func (c *ClusterChecker) tryUpdateMigrationStatus(ctx context.Context, clonedClu
 				log.Error("Failed to update the cluster", zap.Error(err))
 				return
 			}
-			c.updateClusterNoLock(clonedCluster)
+			c.updateCluster(clonedCluster)
 			log.Warn("Failed to migrate the slot", zap.String("slot", migratingSlot.String()))
 		case "success":
 			clonedCluster.Shards[i].SlotRanges = store.RemoveSlotFromSlotRanges(clonedCluster.Shards[i].SlotRanges, shard.MigratingSlot.SlotRange)
@@ -450,7 +446,7 @@ func (c *ClusterChecker) tryUpdateMigrationStatus(ctx context.Context, clonedClu
 			} else {
 				log.Info("Migrate the slot successfully", zap.String("slot", migratedSlot.String()))
 			}
-			c.updateClusterNoLock(clonedCluster)
+			c.updateCluster(clonedCluster)
 			if clonedCluster.MigrationQueue.Available() {
 				log.Info("Migration queue is not empty, migrating queue'd requests")
 				err = clonedCluster.MigrateAvailableSlots(ctx)
@@ -462,7 +458,7 @@ func (c *ClusterChecker) tryUpdateMigrationStatus(ctx context.Context, clonedClu
 					log.Error("Failed to update the cluster", zap.Error(err))
 					return
 				}
-				c.updateClusterNoLock(clonedCluster)
+				c.updateCluster(clonedCluster)
 			}
 		default:
 			clonedCluster.Shards[i].ClearMigrateState()
@@ -470,7 +466,7 @@ func (c *ClusterChecker) tryUpdateMigrationStatus(ctx context.Context, clonedClu
 				log.Error("Failed to update the cluster", zap.Error(err))
 				return
 			}
-			c.updateClusterNoLock(clonedCluster)
+			c.updateCluster(clonedCluster)
 			log.Error("Unknown migrating state", zap.String("state", sourceNodeClusterInfo.MigratingState))
 		}
 	}
@@ -492,12 +488,11 @@ func (c *ClusterChecker) migrationLoop() {
 				continue
 			}
 			clonedCluster := c.cluster.Clone()
+			c.clusterMu.Unlock()
 			if clonedCluster == nil {
-				c.clusterMu.Unlock()
 				continue
 			}
 			c.tryUpdateMigrationStatus(c.ctx, clonedCluster)
-			c.clusterMu.Unlock()
 		}
 	}
 }

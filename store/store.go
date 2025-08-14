@@ -187,14 +187,6 @@ func (s *ClusterStore) UpdateCluster(ctx context.Context, ns string, clusterInfo
 		return fmt.Errorf("the cluster has been updated by others")
 	}
 
-	// We want the most up to date queue. The oldCluster could have had updates to
-	// the migration queue
-	// clusterInfo.MigrationQueue = oldCluster.MigrationQueue
-	// TODO: bseto, need to remember why we had this. I think sometimes clusterInfo would have
-	// out of date info cause it comes from clonedData
-	// but then oldCluster would have the correct newer stuff cause it received a new
-	// migration recently.
-
 	clusterInfo.Version.Add(1)
 	clusterBytes, err := json.Marshal(clusterInfo)
 	if err != nil {
