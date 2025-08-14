@@ -14,9 +14,9 @@ import (
 func main() {
 	client, err := rueidis.NewClient(
 		rueidis.ClientOption{
-			InitAddress:       []string{"127.0.0.1:7000"},
+			InitAddress:       []string{"127.0.0.1:7770"},
 			ShuffleInit:       true,
-			ConnWriteTimeout:  time.Millisecond * 100,
+			ConnWriteTimeout:  time.Millisecond * 300,
 			DisableCache:      true, // client cache is not enabled on kvrocks
 			PipelineMultiplex: 5,
 			MaxFlushDelay:     50 * time.Microsecond,
@@ -29,11 +29,33 @@ func main() {
 		logger.Get().Error("unable to get rueidis client", zap.Error(err))
 		return
 	}
+	ctx := context.Background()
+	payload := []byte("123123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789456789")
+	data := make(map[string][]byte)
+	cols := []string{}
 
-  hSetExpire(ctx, time.Second * 1, client, "hello", , data map[string][]byte, ttl time.Duration)
+	for i := 0; i < 100; i++ {
+		data[fmt.Sprintf("%d", i)] = payload
+		cols = append(cols, fmt.Sprintf("%d", i))
+	}
+
+	for i := 0; i < 1000000; i++ {
+		hSetExpire(ctx, time.Second*1, client, fmt.Sprintf("hello:%d", i), cols, data, time.Hour*24)
+		if i%10000 == 0 {
+			logger.Get().Info("inserted", zap.Int("num", i))
+		}
+	}
 }
 
-func hSetExpire(ctx context.Context, timeout time.Duration, client rueidis.Client, key string, cols []string, data map[string][]byte, ttl time.Duration) error {
+func hSetExpire(
+	ctx context.Context,
+	timeout time.Duration,
+	client rueidis.Client,
+	key string,
+	cols []string,
+	data map[string][]byte,
+	ttl time.Duration,
+) error {
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
