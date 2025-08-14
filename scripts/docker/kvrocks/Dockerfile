@@ -1,5 +1,9 @@
 FROM apache/kvrocks:latest
 USER root
+
+# Copy your custom kvrocks.conf file into the image
+COPY kvrocks.conf /var/lib/kvrocks/kvrocks.conf
+
 RUN mkdir /tmp/kvrocks7770 /tmp/kvrocks7771 /tmp/kvrocks7772 /tmp/kvrocks7773
 
 RUN echo "kvrocks -c /var/lib/kvrocks/kvrocks.conf --port 7770 --dir /tmp/kvrocks7770 --daemonize yes --cluster-enabled yes --bind 0.0.0.0" >> start.sh

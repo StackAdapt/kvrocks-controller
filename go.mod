@@ -12,6 +12,7 @@ require (
 	github.com/hashicorp/consul/api v1.31.2
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/prometheus/client_golang v1.21.1
+	github.com/redis/rueidis v1.0.64
 	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.10.0
 	go.etcd.io/etcd v3.3.27+incompatible
