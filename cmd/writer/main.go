@@ -40,7 +40,10 @@ func main() {
 	}
 
 	for i := 0; i < 1000000; i++ {
-		hSetExpire(ctx, time.Second*1, client, fmt.Sprintf("hello:%d", i), cols, data, time.Hour*24)
+		err := hSetExpire(ctx, time.Second*1, client, fmt.Sprintf("hello:%d", i), cols, data, time.Hour*24)
+		if err != nil {
+			logger.Get().Error("unable to hSetExpire", zap.Error(err))
+		}
 		if i%10000 == 0 {
 			logger.Get().Info("inserted", zap.Int("num", i))
 		}

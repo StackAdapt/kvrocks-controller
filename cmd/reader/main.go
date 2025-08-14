@@ -40,6 +40,7 @@ func main() {
 					logger.Get().Error("err calling hGetAll", zap.Error(err))
 				}
 			}
+			logger.Get().Info("done")
 		}()
 	}
 
