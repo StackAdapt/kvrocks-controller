@@ -21,10 +21,15 @@ CCCOLOR="\033[37;1m"
 MAKECOLOR="\033[32;1m"
 ENDCOLOR="\033[0m"
 
+GOARCH        ?= $(shell go env GOARCH)
+GOOS          ?= $(shell go env GOOS)
+VERSION       =`cat ../../VERSION.txt`
+GO_PROJECT    =github.com/stackadapt/kvrocks-controller
+LDFLAGS       := $(LDFLAGS) -X main.commit=$(GIT_COMMIT)${GIT_DIRTY} -X main.branch=$(GIT_BRANCH) -X main.date=$(DATE) -X $(GO_PROJECT)/version.Version=$(VERSION) 
+
 all: $(PROGRAM)
 
 .PHONY: all
-
 
 $(PROGRAM):
 	@bash scripts/build.sh
@@ -46,3 +51,11 @@ test:
 lint:
 	@printf $(CCCOLOR)"GolangCI Lint...\n"$(ENDCOLOR)
 	@golangci-lint run
+
+.PHONY: client
+client:
+	cd cmd/client; CGO_ENABLED=0 GOARCH=$(GOARCH) GOOS=$(GOOS) go build -v -ldflags "$(LDFLAGS)" -o ./kvctl
+
+.PHONY: server
+server:
+	cd cmd/server; CGO_ENABLED=0 GOARCH=$(GOARCH) GOOS=$(GOOS) go build -v -ldflags "$(LDFLAGS)" -o ./kvctl-server
