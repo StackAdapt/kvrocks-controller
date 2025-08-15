@@ -48,7 +48,8 @@ test:
 	@scripts/run-test.sh
 	@cd scripts && sh teardown.sh && cd ..
 
-lint: @printf $(CCCOLOR)"GolangCI Lint...\n"$(ENDCOLOR)
+lint:
+	@printf $(CCCOLOR)"GolangCI Lint...\n"$(ENDCOLOR)
 	@golangci-lint run
 
 .PHONY: client
