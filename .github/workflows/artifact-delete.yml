@@ -1,0 +1,15 @@
+name: artifact-delete
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  id-token: write # This is required for requesting the JWT
+  contents: read # This is required for actions/checkout
+
+jobs:
+  artifact-delete:
+    uses: StackAdapt/actions/.github/workflows/stargate-delete.yml@main
+    with:
+      component: kvrocks-controller
+      branch: ${{ github.head_ref }}

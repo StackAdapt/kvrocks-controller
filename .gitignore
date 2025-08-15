@@ -40,3 +40,5 @@ cmd/server/kvrocks_controller
 .kc_cli_history
 .vscode/
 vendor
+cmd/client/kvctl
+cmd/server/kvctl-server

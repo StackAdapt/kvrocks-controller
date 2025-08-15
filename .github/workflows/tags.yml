@@ -1,0 +1,55 @@
+name: tags
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  id-token: write # This is required for requesting the JWT
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag_version.outputs.new_tag }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Bump version and push tag
+        id: tag_version
+        uses: StackAdapt/github-tag-action@v6.1
+        with:
+          release_branches: main
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+  artifact-upload-server:
+    needs: [tag]
+    strategy: # If you only need 1 architecture, remove this matrix strategy and directly pass in the architecture
+      matrix:
+        architecture: [amd64, arm64]
+    uses: StackAdapt/actions/.github/workflows/stargate-upload.yml@main
+    with:
+      component: kvrocks-controller
+      binary-name: kvctl-server
+      tag: ${{ needs.tag.outputs.tag }}
+      architecture: ${{ matrix.architecture }}
+      output-dir: cmd/server
+      make-command: server
+    secrets:
+      action-token: ${{ secrets.GO_PRIVATE_MODULES }}
+
+  artifact-upload-client:
+    needs: [tag]
+    strategy: # If you only need 1 architecture, remove this matrix strategy and directly pass in the architecture
+      matrix:
+        architecture: [amd64, arm64]
+    uses: StackAdapt/actions/.github/workflows/stargate-upload.yml@main
+    with:
+      component: kvrocks-controller
+      binary-name: kvctl
+      tag: ${{ needs.tag.outputs.tag }}
+      architecture: ${{ matrix.architecture }}
+      output-dir: cmd/client
+      make-command: client
+    secrets:
+      action-token: ${{ secrets.GO_PRIVATE_MODULES }}

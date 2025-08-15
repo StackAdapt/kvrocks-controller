@@ -1,0 +1,40 @@
+name: artifact-upload
+on:
+  pull_request:
+    types: [opened, synchronize]
+permissions:
+  id-token: write # This is required for requesting the JWT
+  contents: read # This is required for actions/checkout
+jobs:
+  artifact-upload-server:
+    if: "!contains(github.event.pull_request.labels.*.name, 'skip-kvrocks-controller-upload')"
+    strategy: # If you only need 1 architecture, remove this matrix strategy and directly pass in the architecture
+      matrix:
+        architecture: [amd64, arm64]
+    uses: StackAdapt/actions/.github/workflows/stargate-upload.yml@main
+    with:
+      component: kvrocks-controller
+      binary-name: kvctl-server
+      branch: ${{ github.head_ref }}
+      commit: ${{ github.event.pull_request.head.sha }}
+      architecture: ${{ matrix.architecture }}
+      make-command: server
+      output-dir: cmd/server
+    secrets:
+      action-token: ${{ secrets.GO_PRIVATE_MODULES }}
+  artifact-upload-client:
+    if: "!contains(github.event.pull_request.labels.*.name, 'skip-kvrocks-controller-upload')"
+    strategy: # If you only need 1 architecture, remove this matrix strategy and directly pass in the architecture
+      matrix:
+        architecture: [amd64, arm64]
+    uses: StackAdapt/actions/.github/workflows/stargate-upload.yml@main
+    with:
+      component: kvrocks-controller
+      binary-name: kvctl
+      branch: ${{ github.head_ref }}
+      commit: ${{ github.event.pull_request.head.sha }}
+      architecture: ${{ matrix.architecture }}
+      make-command: client
+      output-dir: cmd/client
+    secrets:
+      action-token: ${{ secrets.GO_PRIVATE_MODULES }}
