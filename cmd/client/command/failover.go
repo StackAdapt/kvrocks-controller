@@ -84,6 +84,9 @@ func failoverShard(client *client, options *FailoverOptions, shardIndex int) err
 		SetPathParam("namespace", options.namespace).
 		SetPathParam("cluster", options.cluster).
 		SetPathParam("shard", strconv.Itoa(shardIndex)).
+		SetBody(map[string]interface{}{
+			"preferred_node_id": options.preferred,
+		}).
 		Post("/namespaces/{namespace}/clusters/{cluster}/shards/{shard}/failover")
 	if err != nil {
 		return err
