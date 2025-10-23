@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/apache/kvrocks-controller/logger"
@@ -14,9 +15,10 @@ import (
 )
 
 func main() {
-	numOfWriters := 1000
+	numOfWriters := 10
 	writers := make([]*Writer, numOfWriters)
 	for i := 0; i < numOfWriters; i++ {
+		fmt.Printf("creating writers: %d\n", i)
 		writer, err := NewWriter()
 		if err != nil {
 			logger.Get().Error("unable to get rueidis client", zap.Error(err))
@@ -27,6 +29,7 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
+	fmt.Println("creating payload")
 	payload := []byte("123123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789456789")
 	data := make(map[string][]byte)
 	cols := []string{}
@@ -35,11 +38,16 @@ func main() {
 		cols = append(cols, fmt.Sprintf("%d", i))
 	}
 
+	var wg sync.WaitGroup
+
+	fmt.Println("starting writes")
 	for _, writer := range writers {
-		writer.Start(ctx, data, cols, time.Second)
+		wg.Add(1)
+		go writer.Start(ctx, &wg, data, cols, 2*time.Second)
+		time.Sleep(50 * time.Millisecond)
 	}
 
-	fmt.Println("Please enter some text and press Enter:")
+	fmt.Println("waiting for user input")
 	reader := bufio.NewReader(os.Stdin)
 	// ReadString reads until the first occurrence of the delimiter ('\n' for Enter)
 	// It returns the string read and an error, if any.
@@ -50,6 +58,7 @@ func main() {
 	// Print the input received
 	fmt.Printf("exiting...")
 	cancel()
+	wg.Wait()
 }
 
 type Writer struct {
@@ -63,7 +72,7 @@ func NewWriter() (*Writer, error) {
 			ShuffleInit:       true,
 			ConnWriteTimeout:  time.Millisecond * 300,
 			DisableCache:      true, // client cache is not enabled on kvrocks
-			PipelineMultiplex: 10,
+			PipelineMultiplex: 8,
 			MaxFlushDelay:     50 * time.Microsecond,
 			AlwaysPipelining:  true,
 			DisableTCPNoDelay: true,
@@ -75,17 +84,19 @@ func NewWriter() (*Writer, error) {
 	}, err
 }
 
-func (w *Writer) Start(ctx context.Context, data map[string][]byte, cols []string, sleep time.Duration) error {
+func (w *Writer) Start(ctx context.Context, wg *sync.WaitGroup, data map[string][]byte, cols []string, sleep time.Duration) {
 	for i := 0; ; i++ {
 		err := hSetExpire(ctx, time.Second*1, w.client, fmt.Sprintf("hello:%d", i), cols, data, time.Hour*24)
 		if err != nil {
 			logger.Get().Error("unable to hSetExpire", zap.Error(err))
+			break
 		}
-		if i%10000 == 0 {
+		if i%100 == 0 {
 			logger.Get().Info("inserted", zap.Int("num", i))
 		}
+		time.Sleep(sleep)
 	}
-	return nil
+	wg.Done()
 }
 
 func hSetExpire(
