@@ -43,7 +43,7 @@ func main() {
 	fmt.Println("starting writes")
 	for _, writer := range writers {
 		wg.Add(1)
-		go writer.Start(ctx, &wg, data, cols, 2*time.Second)
+		go writer.Start(ctx, &wg, data, cols, 500*time.Millisecond)
 		time.Sleep(50 * time.Millisecond)
 	}
 
@@ -70,9 +70,9 @@ func NewWriter() (*Writer, error) {
 		rueidis.ClientOption{
 			InitAddress:       []string{"127.0.0.1:7770"},
 			ShuffleInit:       true,
-			ConnWriteTimeout:  time.Millisecond * 300,
+			ConnWriteTimeout:  time.Millisecond * 100,
 			DisableCache:      true, // client cache is not enabled on kvrocks
-			PipelineMultiplex: 8,
+			PipelineMultiplex: 0,
 			MaxFlushDelay:     50 * time.Microsecond,
 			AlwaysPipelining:  true,
 			DisableTCPNoDelay: true,
@@ -86,14 +86,12 @@ func NewWriter() (*Writer, error) {
 
 func (w *Writer) Start(ctx context.Context, wg *sync.WaitGroup, data map[string][]byte, cols []string, sleep time.Duration) {
 	for i := 0; ; i++ {
-		err := hSetExpire(ctx, time.Second*1, w.client, fmt.Sprintf("hello:%d", i), cols, data, time.Hour*24)
+		err := hSetExpire(ctx, time.Second*1, w.client, fmt.Sprintf("hello:%d", i), cols, data, time.Hour*1)
 		if err != nil {
 			logger.Get().Error("unable to hSetExpire", zap.Error(err))
 			break
 		}
-		if i%100 == 0 {
-			logger.Get().Info("inserted", zap.Int("num", i))
-		}
+		// logger.Get().Info("inserted", zap.Int("num", i))
 		time.Sleep(sleep)
 	}
 	wg.Done()

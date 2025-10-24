@@ -2,6 +2,8 @@ module github.com/apache/kvrocks-controller
 
 go 1.23.0
 
+replace github.com/redis/rueidis => ../rueidis/
+
 require (
 	github.com/fatih/color v1.18.0
 	github.com/gin-gonic/gin v1.10.0
