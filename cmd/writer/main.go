@@ -15,7 +15,7 @@ import (
 )
 
 func main() {
-	numOfWriters := 10
+	numOfWriters := 1
 	writers := make([]*Writer, numOfWriters)
 	for i := 0; i < numOfWriters; i++ {
 		fmt.Printf("creating writers: %d\n", i)
