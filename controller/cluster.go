@@ -255,7 +255,7 @@ func (c *ClusterChecker) syncClusterToNodes(ctx context.Context) error {
 	}
 	version := clusterInfo.Version.Load()
 	operationCount := 0
-	staggerDelay := 1000 * time.Millisecond
+	staggerDelay := 5000 * time.Millisecond
 	for _, shard := range clusterInfo.Shards {
 		for _, node := range shard.Nodes {
 			go func(n store.Node, delay time.Duration) {
@@ -285,10 +285,13 @@ func (c *ClusterChecker) parallelProbeNodes(ctx context.Context, cluster *store.
 	var latestClusterNodesStr string
 	var wg sync.WaitGroup
 
+	operationCount := 0
+	staggerDelay := 5000 * time.Millisecond
 	for i, shard := range cluster.Shards {
 		for _, node := range shard.Nodes {
 			wg.Add(1)
-			go func(shardIdx int, n store.Node) {
+			go func(shardIdx int, n store.Node, delay time.Duration) {
+				time.Sleep(delay)
 				defer wg.Done()
 				log := logger.Get().With(
 					zap.String("id", n.ID()),
@@ -336,7 +339,8 @@ func (c *ClusterChecker) parallelProbeNodes(ctx context.Context, cluster *store.
 					mu.Unlock()
 				}
 				c.resetFailureCount(n.ID())
-			}(i, node)
+			}(i, node, time.Duration(operationCount)*staggerDelay)
+			operationCount++
 		}
 	}
 
