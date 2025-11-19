@@ -254,9 +254,12 @@ func (c *ClusterChecker) syncClusterToNodes(ctx context.Context) error {
 		return err
 	}
 	version := clusterInfo.Version.Load()
+	operationCount := 0
+	staggerDelay := 1000 * time.Millisecond
 	for _, shard := range clusterInfo.Shards {
 		for _, node := range shard.Nodes {
-			go func(n store.Node) {
+			go func(n store.Node, delay time.Duration) {
+				time.Sleep(delay)
 				log := logger.Get().With(
 					zap.String("namespace", c.namespace),
 					zap.String("cluster", c.clusterName),
@@ -269,7 +272,8 @@ func (c *ClusterChecker) syncClusterToNodes(ctx context.Context) error {
 				} else {
 					log.Info("Succeed to sync the cluster topology to the node")
 				}
-			}(node)
+			}(node, time.Duration(operationCount)*staggerDelay)
+			operationCount++
 		}
 	}
 	return nil
