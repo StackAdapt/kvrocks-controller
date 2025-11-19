@@ -4,43 +4,52 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"time"
 
-	"github.com/apache/kvrocks-controller/logger"
+	"github.com/StackAdapt/sa-go-adserver/logger"
 	"github.com/redis/rueidis"
 	"go.uber.org/zap"
 )
 
 func main() {
+	logger.InitLogger(true)
+	logger.InitNewLogger(true)
 	// goal is to spam reading and client connections
 	for i := 0; i < 5; i++ {
 		go func() {
 			client, err := rueidis.NewClient(
 				rueidis.ClientOption{
 					InitAddress:       []string{"127.0.0.1:7770"},
+					ConnWriteTimeout:  10 * time.Second, // explicitly set to the rueidis default; otherwise, it would be computed from Dialer.KeepAlive - e.g 60s * 10
 					ShuffleInit:       true,
-					ConnWriteTimeout:  time.Millisecond * 300,
-					DisableCache:      true, // client cache is not enabled on kvrocks
-					PipelineMultiplex: 5,
-					MaxFlushDelay:     50 * time.Microsecond,
+					Dialer:            net.Dialer{KeepAlive: time.Second * 60}, // To decrease the pings
+					DisableCache:      true,                                    // client cache is not enabled on kvrocks
+					PipelineMultiplex: 4,
+					MaxFlushDelay:     20 * time.Microsecond,
 					AlwaysPipelining:  true,
-					DisableTCPNoDelay: true,
 					DisableRetry:      true,
+					ClusterOption: rueidis.ClusterOption{
+						AvoidRefreshOnRedirectMove: true,
+					},
+					QueueType: rueidis.QueueTypeFlowBuffer,
 				},
 			)
 			if err != nil {
-				logger.Get().Error("unable to get rueidis client", zap.Error(err))
+				logger.Error("unable to get rueidis client", zap.Error(err))
 				return
 			}
 			ctx := context.Background()
-			for i := 0; i < 1000000; i++ {
-				_, err := hGetAll(ctx, time.Second, client, fmt.Sprintf("hello:%d", i))
+			for i := 0; i < 10000000; i++ {
+				key := i % 10
+				time.Sleep(5000 * time.Millisecond)
+				_, err := hGetAll(ctx, time.Second, client, fmt.Sprintf("hello:%d", key))
 				if err != nil {
-					logger.Get().Error("err calling hGetAll", zap.Error(err))
+					logger.Error("err calling hGetAll", zap.Error(err))
 				}
 			}
-			logger.Get().Info("done")
+			logger.Info("done")
 		}()
 	}
 

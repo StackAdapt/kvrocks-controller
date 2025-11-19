@@ -33,7 +33,7 @@ func main() {
 	payload := []byte("123123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789456789")
 	data := make(map[string][]byte)
 	cols := []string{}
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 5; i++ {
 		data[fmt.Sprintf("%d", i)] = payload
 		cols = append(cols, fmt.Sprintf("%d", i))
 	}
@@ -43,8 +43,8 @@ func main() {
 	fmt.Println("starting writes")
 	for _, writer := range writers {
 		wg.Add(1)
-		go writer.Start(ctx, &wg, data, cols, 500*time.Millisecond)
-		time.Sleep(50 * time.Millisecond)
+		go writer.Start(ctx, &wg, data, cols, 1*time.Millisecond)
+		time.Sleep(1 * time.Millisecond)
 	}
 
 	fmt.Println("waiting for user input")
@@ -68,11 +68,11 @@ type Writer struct {
 func NewWriter() (*Writer, error) {
 	client, err := rueidis.NewClient(
 		rueidis.ClientOption{
-			InitAddress:       []string{"127.0.0.1:7770"},
+			InitAddress:       []string{"kvrocks0:7770"},
 			ShuffleInit:       true,
 			ConnWriteTimeout:  time.Millisecond * 100,
 			DisableCache:      true, // client cache is not enabled on kvrocks
-			PipelineMultiplex: 0,
+			PipelineMultiplex: 5,
 			MaxFlushDelay:     50 * time.Microsecond,
 			AlwaysPipelining:  true,
 			DisableTCPNoDelay: true,
@@ -91,7 +91,9 @@ func (w *Writer) Start(ctx context.Context, wg *sync.WaitGroup, data map[string]
 			logger.Get().Error("unable to hSetExpire", zap.Error(err))
 			break
 		}
-		// logger.Get().Info("inserted", zap.Int("num", i))
+		if i%500 == 0 {
+			logger.Get().Info("inserted", zap.Int("num", i))
+		}
 		time.Sleep(sleep)
 	}
 	wg.Done()

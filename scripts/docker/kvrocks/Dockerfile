@@ -1,4 +1,4 @@
-FROM apache/kvrocks:latest
+FROM apache/kvrocks:2.12.1
 USER root
 
 # Copy your custom kvrocks.conf file into the image
