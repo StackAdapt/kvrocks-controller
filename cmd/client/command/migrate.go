@@ -46,6 +46,9 @@ var MigrateCommand = &cobra.Command{
 	Example: `
 # Migrate slot between cluster shards 
 kvctl migrate slot <slot> --target <target_shard_index> -n <namespace> -c <cluster>
+
+# Clear the queue for migration - does not stop the current migration
+kvctl migrate clear -n <namespace> -c <cluster>
 `,
 	PreRunE: migrationPreRun,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -53,8 +56,10 @@ kvctl migrate slot <slot> --target <target_shard_index> -n <namespace> -c <clust
 		client := newClient(host)
 		resource := strings.ToLower(args[0])
 		switch resource {
-		case "slot":
+		case MigrateSlot:
 			return migrateSlot(client, &migrateOptions)
+		case MigrateClear:
+			return migrateClear(client, &migrateOptions)
 		default:
 			return fmt.Errorf("unsupported resource type: %s", resource)
 		}
@@ -63,9 +68,40 @@ kvctl migrate slot <slot> --target <target_shard_index> -n <namespace> -c <clust
 	SilenceErrors: true,
 }
 
+func migrateClear(client *client, options *MigrationOptions) error {
+	rsp, err := client.restyCli.R().
+		SetPathParam("namespace", options.namespace).
+		SetPathParam("cluster", options.cluster).
+		SetBody(map[string]interface{}{
+			"slot":     options.slot,
+			"target":   options.target,
+			"slotOnly": strconv.FormatBool(options.slotOnly),
+		}).
+		Delete("/namespaces/{namespace}/clusters/{cluster}/migrate")
+	if err != nil {
+		return err
+	}
+	if rsp.IsError() {
+		return errors.New(rsp.String())
+	}
+	printLine("migrate slot[%s] task is submitted successfully.", options.slot)
+	return nil
+}
+
 func migrationPreRun(_ *cobra.Command, args []string) error {
 	if len(args) < 1 {
 		return fmt.Errorf("resource type should be specified")
+	}
+	resource := strings.ToLower(args[0])
+	if migrateOptions.namespace == "" {
+		return fmt.Errorf("namespace is required, please specify with -n or --namespace")
+	}
+	if migrateOptions.cluster == "" {
+		return fmt.Errorf("cluster is required, please specify with -c or --cluster")
+	}
+	// for migrate clear, we only need namespace and cluster
+	if resource == MigrateClear {
+		return nil
 	}
 	if len(args) < 2 {
 		return fmt.Errorf("the slot number should be specified")
@@ -76,12 +112,6 @@ func migrationPreRun(_ *cobra.Command, args []string) error {
 	}
 	migrateOptions.slot = args[1]
 
-	if migrateOptions.namespace == "" {
-		return fmt.Errorf("namespace is required, please specify with -n or --namespace")
-	}
-	if migrateOptions.cluster == "" {
-		return fmt.Errorf("cluster is required, please specify with -c or --cluster")
-	}
 	if migrateOptions.target < 0 {
 		return fmt.Errorf("target is required, please specify with --target")
 	}

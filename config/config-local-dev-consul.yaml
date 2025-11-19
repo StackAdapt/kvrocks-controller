@@ -15,29 +15,35 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-FROM golang:1.23 as build
 
-WORKDIR /kvctl
+addr: "0.0.0.0:9379"
 
-# If you encounter some issues when pulling modules, \
-# you can try to use GOPROXY, especially in China.
-# ENV GOPROXY=https://goproxy.cn
+# Which store engine should be used by controller
+# options: etcd, zookeeper, raft, consul
+# Note: the raft engine is an experimental feature and is not recommended for production use.
+#
+# default: etcd
+storage_type: consul
 
-COPY . .
-RUN make
+consul:
+  addrs:
+    - "consul0:8500"
+  elect_path:
+  tls:
+    enable: false
+    cert_file:
+    key_file:
+    ca_file:
 
-
-FROM ubuntu:focal
-
-WORKDIR /kvctl
-
-COPY --from=build /kvctl/_build/kvctl-server ./bin/
-COPY --from=build /kvctl/_build/kvctl ./bin/
-
-VOLUME /var/lib/kvctl
-
-COPY ./LICENSE ./NOTICE ./licenses ./
-COPY ./config/* /var/lib/kvctl/
-
-EXPOSE 9379:9379
-ENTRYPOINT ["./bin/kvctl-server", "-c", "/var/lib/kvctl/config.yaml"]
+controller:
+  failover:
+    ping_interval_seconds: 3
+    min_alive_size: 5
+# Uncomment this part to save logs to filename instead of stdout
+#log:
+#  level: info
+#  filename: /data/logs/kvctl.log
+#  max_backups: 10
+#  max_age: 7
+#  max_size: 100
+#  compress: false

@@ -26,3 +26,8 @@ const (
 	ResourceShard     = "shard"
 	ResourceNode      = "node"
 )
+
+const (
+	MigrateSlot  = "slot"
+	MigrateClear = "clear"
+)

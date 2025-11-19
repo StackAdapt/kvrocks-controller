@@ -31,12 +31,57 @@ import (
 	"sync/atomic"
 
 	"github.com/apache/kvrocks-controller/consts"
+	"github.com/apache/kvrocks-controller/logger"
+	"go.uber.org/zap"
 )
 
 type Cluster struct {
-	Name    string       `json:"name"`
-	Version atomic.Int64 `json:"-"`
-	Shards  []*Shard     `json:"shards"`
+	Name           string         `json:"name"`
+	Version        atomic.Int64   `json:"-"`
+	Shards         []*Shard       `json:"shards"`
+	MigrationQueue MigrationQueue `json:"migration_queue"`
+}
+
+type MigrationQueue struct {
+	// Migrations can be done in parallel as long as the source shard, and target shard
+	// are currently not migrating. This means we should always loop through the Data
+	// and try.
+	Data []Migration `json:"queue"`
+}
+
+type Migration struct {
+	Target   int       `json:"target"`
+	Slot     SlotRange `json:"slots"`
+	SlotOnly bool      `json:"slot_only"`
+}
+
+func (m *MigrationQueue) Clone() MigrationQueue {
+	q := MigrationQueue{
+		Data: make([]Migration, len(m.Data)),
+	}
+	copy(q.Data, m.Data)
+	return q
+}
+
+func (m *MigrationQueue) Enqueue(migration Migration) {
+	m.Data = append(m.Data, migration)
+}
+
+func (m *MigrationQueue) Dequeue() (Migration, bool) {
+	if len(m.Data) == 0 {
+		return Migration{}, false
+	}
+	val := m.Data[0]
+	m.Data = m.Data[1:]
+	return val, true
+}
+
+func (m *MigrationQueue) Available() bool {
+	return len(m.Data) > 0
+}
+
+func (m *MigrationQueue) Clear() {
+	m.Data = nil
 }
 
 func NewCluster(name string, nodes []string, replicas int) (*Cluster, error) {
@@ -72,15 +117,16 @@ func NewCluster(name string, nodes []string, replicas int) (*Cluster, error) {
 		shards = append(shards, shard)
 	}
 
-	cluster := &Cluster{Name: name, Shards: shards}
+	cluster := &Cluster{Name: name, Shards: shards, MigrationQueue: MigrationQueue{}}
 	cluster.Version.Store(1)
 	return cluster, nil
 }
 
 func (cluster *Cluster) Clone() *Cluster {
 	clone := &Cluster{
-		Name:   cluster.Name,
-		Shards: make([]*Shard, 0),
+		Name:           cluster.Name,
+		Shards:         make([]*Shard, 0),
+		MigrationQueue: cluster.MigrationQueue.Clone(),
 	}
 	clone.Version.Store(cluster.Version.Load())
 	for _, shard := range cluster.Shards {
@@ -195,7 +241,23 @@ func (cluster *Cluster) findShardIndexBySlot(slot SlotRange) (int, error) {
 	return sourceShardIdx, nil
 }
 
+func (cluster *Cluster) MigrateAvailableSlots(ctx context.Context) error {
+	if !cluster.MigrationQueue.Available() {
+		return consts.ErrNoMigrationsAvailable
+	}
+	queueCopy := cluster.MigrationQueue.Clone().Data
+	cluster.MigrationQueue.Clear()
+	for _, request := range queueCopy {
+		err := cluster.MigrateSlot(ctx, request.Slot, request.Target, request.SlotOnly)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (cluster *Cluster) MigrateSlot(ctx context.Context, slot SlotRange, targetShardIdx int, slotOnly bool) error {
+	log := logger.Get()
 	if targetShardIdx < 0 || targetShardIdx >= len(cluster.Shards) {
 		return consts.ErrIndexOutOfRange
 	}
@@ -214,8 +276,15 @@ func (cluster *Cluster) MigrateSlot(ctx context.Context, slot SlotRange, targetS
 		return nil
 	}
 
-	if cluster.Shards[sourceShardIdx].IsMigrating() || cluster.Shards[targetShardIdx].IsMigrating() {
-		return consts.ErrShardSlotIsMigrating
+	if !cluster.CanMigrate(sourceShardIdx, targetShardIdx) {
+		log.Info(
+			"source or target shard is already involved in a migration, queueing up a migration",
+			zap.String("slot", slot.String()),
+			zap.Int("source", sourceShardIdx),
+			zap.Int("target", targetShardIdx),
+		)
+		cluster.MigrationQueue.Enqueue(Migration{Target: targetShardIdx, Slot: slot, SlotOnly: slotOnly})
+		return nil
 	}
 	// Send the migration command to the source node
 	sourceMasterNode := cluster.Shards[sourceShardIdx].GetMasterNode()
@@ -231,6 +300,22 @@ func (cluster *Cluster) MigrateSlot(ctx context.Context, slot SlotRange, targetS
 	cluster.Shards[sourceShardIdx].MigratingSlot = FromSlotRange(slot)
 	cluster.Shards[sourceShardIdx].TargetShardIndex = targetShardIdx
 	return nil
+}
+
+func (cluster *Cluster) CanMigrate(sourceIdx, targetIdx int) bool {
+	// need to check if source or target is already migrating
+	if cluster.Shards[sourceIdx].IsMigrating() || cluster.Shards[targetIdx].IsMigrating() {
+		return false
+	}
+
+	// also need to check if anything is migrating to the source, or the target too
+	for _, shard := range cluster.Shards {
+		if shard.TargetShardIndex == sourceIdx || shard.TargetShardIndex == targetIdx {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (cluster *Cluster) SetSlot(ctx context.Context, slot int, targetNodeID string) error {

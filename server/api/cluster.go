@@ -26,7 +26,9 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/apache/kvrocks-controller/logger"
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 
 	"github.com/apache/kvrocks-controller/consts"
 	"github.com/apache/kvrocks-controller/server/helper"
@@ -35,7 +37,7 @@ import (
 
 type MigrateSlotRequest struct {
 	Target   int             `json:"target" validate:"required"`
-	Slot     store.SlotRange `json:"slot" validate:"required"` // we don't use store.MigratingSlot here because we expect a valid SlotRange
+	Slot     store.SlotRange `json:"slot" validate:"required"`
 	SlotOnly bool            `json:"slot_only"`
 }
 
@@ -126,6 +128,33 @@ func (handler *ClusterHandler) Remove(c *gin.Context) {
 	helper.ResponseNoContent(c)
 }
 
+func (handler *ClusterHandler) DeleteMigrateQueue(c *gin.Context) {
+	namespace := c.Param("namespace")
+	clusterName := c.Param("cluster")
+	log := logger.Get().With(
+		zap.String("namespace", namespace),
+		zap.String("cluster", clusterName))
+	log.Info("deleting migration queue")
+
+	lock := handler.getLock(namespace, clusterName)
+	lock.Lock()
+	defer lock.Unlock()
+
+	s, _ := c.MustGet(consts.ContextKeyStore).(*store.ClusterStore)
+	cluster, err := s.GetCluster(c, namespace, clusterName)
+	if err != nil {
+		helper.ResponseError(c, err)
+		return
+	}
+	cluster.MigrationQueue.Clear()
+	err = s.SetCluster(c, namespace, cluster)
+	if err != nil {
+		helper.ResponseError(c, err)
+		return
+	}
+	helper.ResponseOK(c, gin.H{"cluster": cluster})
+}
+
 func (handler *ClusterHandler) MigrateSlot(c *gin.Context) {
 	namespace := c.Param("namespace")
 	clusterName := c.Param("cluster")
@@ -147,6 +176,11 @@ func (handler *ClusterHandler) MigrateSlot(c *gin.Context) {
 		return
 	}
 
+	log := logger.Get().With(
+		zap.String("namespace", namespace),
+		zap.String("cluster", cluster.Name))
+
+	log.Info("migrate slot!")
 	err = cluster.MigrateSlot(c, req.Slot, req.Target, req.SlotOnly)
 	if err != nil {
 		helper.ResponseError(c, err)
@@ -156,7 +190,7 @@ func (handler *ClusterHandler) MigrateSlot(c *gin.Context) {
 	if req.SlotOnly {
 		err = handler.s.UpdateCluster(c, namespace, cluster)
 	} else {
-		// The version should be increased after the slot migration is done
+		log.Info("setting cluster from MigrateSlot call")
 		err = handler.s.SetCluster(c, namespace, cluster)
 	}
 	if err != nil {

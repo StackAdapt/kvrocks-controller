@@ -44,6 +44,8 @@ type SlotRange struct {
 
 type SlotRanges []SlotRange
 
+// MigratingSlot is a wrapper around SlotRange but it's meant to be used
+// to store the migration state in the cluster information.
 type MigratingSlot struct {
 	SlotRange
 	IsMigrating bool

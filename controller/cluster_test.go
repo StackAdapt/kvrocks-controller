@@ -231,7 +231,74 @@ func TestCluster_MigrateSlot(t *testing.T) {
 	clusterProbe.Start()
 	defer clusterProbe.Close()
 
-	ticker := time.NewTicker(400 * time.Millisecond)
+	ticker := time.NewTicker(2000 * time.Millisecond)
 	defer ticker.Stop()
 	<-ticker.C
+}
+
+func TestCluster_MigrateQueuedSlot(t *testing.T) {
+	ctx := context.Background()
+	ns := "test-ns"
+	clusterName := "test-clusterProbe"
+	nodes := []string{"127.0.0.1:7770", "127.0.0.1:7771", "127.0.0.1:7772", "127.0.0.1:7773"}
+	cluster, err := store.NewCluster(clusterName, nodes, 1)
+	require.NoError(t, err)
+
+	require.NoError(t, cluster.Reset(ctx))
+	require.NoError(t, cluster.SyncToNodes(ctx))
+	defer func() {
+		require.NoError(t, cluster.Reset(ctx))
+	}()
+
+	// migrate slots from shard 0 to shard 1
+	slotRange1, err := store.NewSlotRange(1, 1)
+	require.NoError(t, err)
+	require.NoError(t, cluster.MigrateSlot(ctx, slotRange1, 1, false))
+	slotRange2, err := store.NewSlotRange(2, 2)
+	require.NoError(t, err)
+	require.NoError(t, cluster.MigrateSlot(ctx, slotRange2, 1, false))
+
+	// migrate slots from shard 2 to shard 3
+	slotRange3, err := store.NewSlotRange(8192, 8192)
+	require.NoError(t, err)
+	require.NoError(t, cluster.MigrateSlot(ctx, slotRange3, 3, false))
+	slotRange4, err := store.NewSlotRange(8193, 8193)
+	require.NoError(t, err)
+	require.NoError(t, cluster.MigrateSlot(ctx, slotRange4, 3, false))
+
+	// only 2 should be queue'd because slot(1,1) and slot(4097,4097) should have no
+	// shard conflict and can run in parallel
+	// slot(2,2) and slot(4098,4098) will be blocked and queue'd up
+	require.Equal(t, 2, len(cluster.MigrationQueue.Data), "expected migration queue to be len 2")
+
+	s := NewMockClusterStore()
+	require.NoError(t, s.CreateCluster(ctx, ns, cluster))
+
+	clusterProbe := NewClusterChecker(s, ns, clusterName)
+	clusterProbe.WithPingInterval(200 * time.Millisecond) // minimum is 200 milliseconds
+	clusterProbe.Start()
+	defer clusterProbe.Close()
+
+	ticker := time.NewTicker(6000 * time.Millisecond)
+	defer ticker.Stop()
+	<-ticker.C
+	cluster, err = s.GetCluster(ctx, ns, clusterName)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(cluster.MigrationQueue.Data), "expected migration queue to be len 0")
+
+	// we expect slots 1, and 2 on shard 2, from shard 0
+	expectedSlotRange1, err := store.NewSlotRange(1, 2)
+	require.NoError(t, err)
+	expectedSlotRange2, err := store.NewSlotRange(4096, 8191)
+	require.NoError(t, err)
+	expectedSlotRanges := []store.SlotRange{expectedSlotRange1, expectedSlotRange2}
+	require.Equal(t, expectedSlotRanges, cluster.Shards[1].SlotRanges)
+
+	// we expect slots 4097, and 4098 on shard 3 from shard 1
+	expectedSlotRange1, err = store.NewSlotRange(8192, 8193)
+	require.NoError(t, err)
+	expectedSlotRange2, err = store.NewSlotRange(12288, 16383)
+	require.NoError(t, err)
+	expectedSlotRanges = []store.SlotRange{expectedSlotRange1, expectedSlotRange2}
+	require.Equal(t, expectedSlotRanges, cluster.Shards[3].SlotRanges)
 }

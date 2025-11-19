@@ -22,6 +22,7 @@ package controller
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -58,8 +59,22 @@ type ClusterChecker struct {
 	ctx      context.Context
 	cancelFn context.CancelFunc
 
+	startHooks []Hook
+
 	wg sync.WaitGroup
 }
+
+// HookParams, any writes/updates to the `cluster` variable will automatically
+// be saved to the ClusterChecker after all the hooks are run
+type HookParams struct {
+	options      ClusterCheckOptions
+	clusterStore store.Store
+	cluster      *store.Cluster
+	namespace    string
+	clusterName  string
+}
+
+type Hook func(context.Context, *HookParams) error
 
 func NewClusterChecker(s store.Store, ns, cluster string) *ClusterChecker {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -78,14 +93,70 @@ func NewClusterChecker(s store.Store, ns, cluster string) *ClusterChecker {
 		ctx:      ctx,
 		cancelFn: cancel,
 	}
+	c.AddStartHook(InitializeClusterInfo()) // needs to be first to initialize cluster info
+	c.AddStartHook(MigrateAvailableSlots())
 	return c
 }
 
 func (c *ClusterChecker) Start() {
+	c.triggerStartHooks()
+
 	c.wg.Add(1)
 	go c.probeLoop()
 	c.wg.Add(1)
 	go c.migrationLoop()
+}
+
+func InitializeClusterInfo() Hook {
+	return func(ctx context.Context, params *HookParams) error {
+		clusterInfo, err := params.clusterStore.GetCluster(ctx, params.namespace, params.clusterName)
+		if err != nil {
+			return fmt.Errorf("failed to get the clusterName info from the clusterStore: %w", err)
+		}
+		params.cluster = clusterInfo
+		return nil
+	}
+}
+
+func MigrateAvailableSlots() Hook {
+	return func(ctx context.Context, params *HookParams) error {
+		if params.cluster.MigrationQueue.Available() {
+			err := params.cluster.MigrateAvailableSlots(ctx)
+			if err != nil {
+				return err
+			}
+			if err := params.clusterStore.SetCluster(ctx, params.namespace, params.cluster); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
+
+func (c *ClusterChecker) AddStartHook(hooks ...Hook) {
+	c.startHooks = append(c.startHooks, hooks...)
+}
+
+func (c *ClusterChecker) triggerStartHooks() {
+	log := logger.Get().With(
+		zap.String("namespace", c.namespace),
+		zap.String("cluster", c.clusterName))
+	c.clusterMu.Lock()
+	defer c.clusterMu.Unlock()
+
+	params := &HookParams{
+		options:      c.options,
+		clusterStore: c.clusterStore,
+		cluster:      c.cluster, // we have the clusterMu lock, so it's ok that hooks can access this cluster var directly
+		namespace:    c.namespace,
+		clusterName:  c.clusterName,
+	}
+	for _, hook := range c.startHooks {
+		err := hook(c.ctx, params)
+		if err != nil {
+			log.Error("start hook", zap.Error(err))
+		}
+	}
 }
 
 func (c *ClusterChecker) WithPingInterval(interval time.Duration) *ClusterChecker {
@@ -183,9 +254,12 @@ func (c *ClusterChecker) syncClusterToNodes(ctx context.Context) error {
 		return err
 	}
 	version := clusterInfo.Version.Load()
+	operationCount := 0
+	staggerDelay := 5000 * time.Millisecond
 	for _, shard := range clusterInfo.Shards {
 		for _, node := range shard.Nodes {
-			go func(n store.Node) {
+			go func(n store.Node, delay time.Duration) {
+				time.Sleep(delay)
 				log := logger.Get().With(
 					zap.String("namespace", c.namespace),
 					zap.String("cluster", c.clusterName),
@@ -198,7 +272,8 @@ func (c *ClusterChecker) syncClusterToNodes(ctx context.Context) error {
 				} else {
 					log.Info("Succeed to sync the cluster topology to the node")
 				}
-			}(node)
+			}(node, time.Duration(operationCount)*staggerDelay)
+			operationCount++
 		}
 	}
 	return nil
@@ -210,10 +285,13 @@ func (c *ClusterChecker) parallelProbeNodes(ctx context.Context, cluster *store.
 	var latestClusterNodesStr string
 	var wg sync.WaitGroup
 
+	operationCount := 0
+	staggerDelay := 5000 * time.Millisecond
 	for i, shard := range cluster.Shards {
 		for _, node := range shard.Nodes {
 			wg.Add(1)
-			go func(shardIdx int, n store.Node) {
+			go func(shardIdx int, n store.Node, delay time.Duration) {
+				time.Sleep(delay)
 				defer wg.Done()
 				log := logger.Get().With(
 					zap.String("id", n.ID()),
@@ -261,7 +339,8 @@ func (c *ClusterChecker) parallelProbeNodes(ctx context.Context, cluster *store.
 					mu.Unlock()
 				}
 				c.resetFailureCount(n.ID())
-			}(i, node)
+			}(i, node, time.Duration(operationCount)*staggerDelay)
+			operationCount++
 		}
 	}
 
@@ -302,8 +381,8 @@ func (c *ClusterChecker) probeLoop() {
 			}
 			c.clusterMu.Lock()
 			c.cluster = clusterInfo
-			c.clusterMu.Unlock()
 			c.parallelProbeNodes(c.ctx, clusterInfo)
+			c.clusterMu.Unlock()
 		case <-c.syncCh:
 			if err := c.syncClusterToNodes(c.ctx); err != nil {
 				log.Error("Failed to sync the clusterName to the nodes", zap.Error(err))
@@ -376,6 +455,19 @@ func (c *ClusterChecker) tryUpdateMigrationStatus(ctx context.Context, clonedClu
 				log.Info("Migrate the slot successfully", zap.String("slot", migratedSlot.String()))
 			}
 			c.updateCluster(clonedCluster)
+			if clonedCluster.MigrationQueue.Available() {
+				log.Info("Migration queue is not empty, migrating queue'd requests")
+				err = clonedCluster.MigrateAvailableSlots(ctx)
+				if err != nil {
+					log.Error("Unable to trigger", zap.Error(err))
+					continue
+				}
+				if err := c.clusterStore.SetCluster(ctx, c.namespace, clonedCluster); err != nil {
+					log.Error("Failed to update the cluster", zap.Error(err))
+					return
+				}
+				c.updateCluster(clonedCluster)
+			}
 		default:
 			clonedCluster.Shards[i].ClearMigrateState()
 			if err := c.clusterStore.SetCluster(ctx, c.namespace, clonedCluster); err != nil {
