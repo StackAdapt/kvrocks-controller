@@ -1,12 +1,14 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
+	"runtime"
 	"strconv"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/apache/kvrocks-controller/logger"
@@ -15,10 +17,10 @@ import (
 )
 
 func main() {
-	numOfWriters := 1
+	numOfWriters := runtime.GOMAXPROCS(0)
 	writers := make([]*Writer, numOfWriters)
 	for i := 0; i < numOfWriters; i++ {
-		fmt.Printf("creating writers: %d\n", i)
+		logger.Get().Info("creating writers", zap.Int("num", i))
 		writer, err := NewWriter()
 		if err != nil {
 			logger.Get().Error("unable to get rueidis client", zap.Error(err))
@@ -29,36 +31,47 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	fmt.Println("creating payload")
+	logger.Get().Info("creating payload")
 	payload := []byte("123123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789456789")
 	data := make(map[string][]byte)
 	cols := []string{}
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 100; i++ {
 		data[fmt.Sprintf("%d", i)] = payload
 		cols = append(cols, fmt.Sprintf("%d", i))
 	}
 
 	var wg sync.WaitGroup
 
-	fmt.Println("starting writes")
+	logger.Get().Info("starting writers")
 	for _, writer := range writers {
 		wg.Add(1)
-		go writer.Start(ctx, &wg, data, cols, 1*time.Millisecond)
-		time.Sleep(1 * time.Millisecond)
+		go writer.Start(ctx, &wg, data, cols, 0*time.Millisecond)
+		time.Sleep(0 * time.Millisecond)
 	}
 
-	fmt.Println("waiting for user input")
-	reader := bufio.NewReader(os.Stdin)
-	// ReadString reads until the first occurrence of the delimiter ('\n' for Enter)
-	// It returns the string read and an error, if any.
-	_, err := reader.ReadString('\n')
-	if err != nil {
-		fmt.Printf("error reading string")
-	}
-	// Print the input received
-	fmt.Printf("exiting...")
+	logger.Get().Info("service running, waiting for shutdown signal")
+
+	// Set up signal handling for systemd
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	// Wait for shutdown signal
+	sig := <-sigChan
+	logger.Get().Info("received shutdown signal", zap.String("signal", sig.String()))
+	logger.Get().Info("shutting down gracefully...")
+
 	cancel()
 	wg.Wait()
+
+	// Close all clients
+	logger.Get().Info("closing clients")
+	for _, writer := range writers {
+		if writer != nil && writer.client != nil {
+			writer.client.Close()
+		}
+	}
+
+	logger.Get().Info("shutdown complete")
 }
 
 type Writer struct {
@@ -68,7 +81,7 @@ type Writer struct {
 func NewWriter() (*Writer, error) {
 	client, err := rueidis.NewClient(
 		rueidis.ClientOption{
-			InitAddress:       []string{"kvrocks0:7770"},
+			InitAddress:       []string{"kvrocks-byron-test.us-east-1.stackadapt:6379"},
 			ShuffleInit:       true,
 			ConnWriteTimeout:  time.Millisecond * 100,
 			DisableCache:      true, // client cache is not enabled on kvrocks
@@ -85,18 +98,38 @@ func NewWriter() (*Writer, error) {
 }
 
 func (w *Writer) Start(ctx context.Context, wg *sync.WaitGroup, data map[string][]byte, cols []string, sleep time.Duration) {
+	defer wg.Done()
 	for i := 0; ; i++ {
-		err := hSetExpire(ctx, time.Second*1, w.client, fmt.Sprintf("hello:%d", i), cols, data, time.Hour*1)
+		// Check for context cancellation
+		select {
+		case <-ctx.Done():
+			logger.Get().Info("writer stopping due to context cancellation")
+			return
+		default:
+		}
+
+		err := hSetExpire(ctx, time.Second*1, w.client, fmt.Sprintf("%d", i), cols, data, time.Hour*1)
 		if err != nil {
+			// Check if error is due to context cancellation
+			if ctx.Err() != nil {
+				logger.Get().Info("writer stopping due to context cancellation", zap.Error(err))
+				return
+			}
 			logger.Get().Error("unable to hSetExpire", zap.Error(err))
 			break
 		}
 		if i%500 == 0 {
 			logger.Get().Info("inserted", zap.Int("num", i))
 		}
-		time.Sleep(sleep)
+
+		// Use context-aware sleep
+		select {
+		case <-ctx.Done():
+			logger.Get().Info("writer stopping due to context cancellation")
+			return
+		case <-time.After(sleep):
+		}
 	}
-	wg.Done()
 }
 
 func hSetExpire(
