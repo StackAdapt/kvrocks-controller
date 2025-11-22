@@ -52,6 +52,9 @@ func main() {
 	flag.Parse()
 	logger.Info("starting service", zap.Int("readers", *numReaders), zap.Duration("delay", *readDelay), zap.Int("start", *start))
 	// goal is to spam reading and client connections
+
+	kvRocksLiteReadTimeout := 50 * time.Millisecond // context timeout
+
 	for i := 0; i < *numReaders; i++ {
 		wg.Add(1)
 		go func(id int, sleep time.Duration, startIndex int) {
@@ -92,7 +95,7 @@ func main() {
 				}
 				// Convert integer i to alphabet-only key before passing to hGetAll
 				alphabetKey := intToAlphabetKey(int64(i))
-				_, err := hGetAll(ctx, time.Second, client, alphabetKey)
+				_, err := hGetAll(ctx, kvRocksLiteReadTimeout, client, alphabetKey)
 				if err != nil {
 					// Check if error is due to context cancellation
 					if ctx.Err() != nil {
