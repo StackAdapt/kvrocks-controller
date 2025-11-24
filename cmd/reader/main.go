@@ -53,7 +53,7 @@ func main() {
 	logger.Info("starting service", zap.Int("readers", *numReaders), zap.Duration("delay", *readDelay), zap.Int("start", *start))
 	// goal is to spam reading and client connections
 
-	kvRocksLiteReadTimeout := 50 * time.Millisecond // context timeout
+	kvRocksLiteReadTimeout := 1000 * time.Millisecond // context timeout
 
 	for i := 0; i < *numReaders; i++ {
 		wg.Add(1)

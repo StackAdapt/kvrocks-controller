@@ -1,0 +1,12 @@
+---
+# Usage: ansible-playbook -i ../ansible-load-nodes.ini start-reader.yml
+# Or from parent directory: ansible-playbook -i ansible-load-nodes.ini playbooks/start-reader.yml
+- name: Start reader service on load nodes
+  hosts: load_nodes
+  become: true
+  tasks:
+    - name: Start reader service
+      ansible.builtin.systemd:
+        name: reader
+        state: started
+        enabled: yes

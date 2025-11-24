@@ -1,0 +1,18 @@
+---
+# Usage: ansible-playbook -i ../ansible-load-nodes.ini copy-reader.yml
+# Or from parent directory: ansible-playbook -i ansible-load-nodes.ini playbooks/copy-reader.yml
+- name: Copy reader binary to load nodes
+  hosts: load_nodes
+  become: true
+  tasks:
+    - name: Copy reader service to remote hosts
+      ansible.builtin.copy:
+        src: /Users/byron.seto/Documents/workspace/third_party/kvrocks-controller/cmd/reader/reader.service
+        dest: /etc/systemd/system/reader.service
+        mode: "0644"
+        owner: root
+        group: root
+
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: yes
