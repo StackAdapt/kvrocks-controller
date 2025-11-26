@@ -47,11 +47,11 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	logger.Get().Info("creating payload")
-	payload := []byte("1123123456789123456712312345678912123123456789123456712312345678912345671231234567891234567123123456789123456734567123123456789123456712312345678912345672312345678912345671231234567891212312345678912345671231234567891234567123123456789123456712312345678912345673456712312345678912345671231234567891234567")
+	payload := []byte("11123123456789123456712312345678912123123456789123456712312345678912345671231234567891234567123123456789123456734567123123456789123456712312345678912345672312345678912345671231234567891212312345678912345671231234567891234567123123456789123456712312345678912345673456712312345678912345671231234567891234567123123456789123456712312345678912123123456789123456712312345678912345671231234567891234567123123456789123456734567123123456789123456712312345678912345672312345678912345671231234567891212312345678912345671231234567891234567123123456789123456712312345678912345673456712312345678912345671231234567891234567")
 	payloadSize := len(payload)
 	data := make(map[string][]byte)
 	cols := []string{}
-	for i := 0; i < 50; i++ {
+	for i := 0; i < 300; i++ {
 		data[fmt.Sprintf("%d", i)] = payload
 		cols = append(cols, fmt.Sprintf("%d", i))
 	}
@@ -69,7 +69,6 @@ func main() {
 	for i, writer := range writers {
 		wg.Add(1)
 		go writer.Start(ctx, &wg, data, cols, *writeDelay, int64(*start), i, numOfWriters)
-		time.Sleep(0 * time.Millisecond)
 	}
 
 	logger.Get().Info("service running, waiting for shutdown signal")
@@ -106,7 +105,7 @@ func NewWriter() (*Writer, error) {
 		rueidis.ClientOption{
 			InitAddress:       []string{"kvrocks-byron-test.us-east-1.stackadapt:6379"},
 			ShuffleInit:       true,
-			ConnWriteTimeout:  time.Millisecond * 100,
+			ConnWriteTimeout:  time.Millisecond * 2500,
 			DisableCache:      true, // client cache is not enabled on kvrocks
 			PipelineMultiplex: 5,
 			MaxFlushDelay:     50 * time.Microsecond,
@@ -158,7 +157,7 @@ func (w *Writer) Start(ctx context.Context, wg *sync.WaitGroup, data map[string]
 
 		// Convert integer keyIndex to alphabet-only key before passing to hSetExpire
 		alphabetKey := intToAlphabetKey(keyIndex)
-		err := hSetExpire(ctx, time.Second*1, w.client, alphabetKey, cols, data, time.Hour*24*7)
+		err := hSetExpire(ctx, time.Millisecond*2000, w.client, alphabetKey, cols, data, time.Hour*24*7)
 		if err != nil {
 			// Check if error is due to context cancellation
 			if ctx.Err() != nil {

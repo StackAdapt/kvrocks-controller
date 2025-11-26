@@ -1,0 +1,13 @@
+---
+# Usage: ansible-playbook -i ../ansible-load-nodes.ini copy-reader.yml
+# Or from parent directory: ansible-playbook -i ansible-load-nodes.ini playbooks/copy-reader.yml
+- name: Copy writer binary to load nodes
+  hosts: load_nodes
+  tasks:
+    - name: Copy reader binary to remote hosts
+      ansible.builtin.copy:
+        src: /Users/byron.seto/Documents/workspace/third_party/kvrocks-controller/cmd/writer/writer
+        dest: /home/ec2-user/writer
+        mode: "0755"
+        owner: ec2-user
+        group: ec2-user

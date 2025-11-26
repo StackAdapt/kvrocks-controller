@@ -1,0 +1,17 @@
+[Unit]
+Description=Byron Test Reader
+After=network-online.target syslog.target remote-fs.target nss-lookup.target sysdrun.service
+Wants=network-online.target
+
+[Service]
+ExecStart=/home/ec2-user/writer -writers 8 -delay 1ms -start 800000000
+
+LimitNOFILE=1048576
+LimitSTACK=16777216
+TimeoutSec=590
+MemoryMax=95%
+OOMScoreAdjust=1000
+
+[Install]
+WantedBy=multi-user.target
+

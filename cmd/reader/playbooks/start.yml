@@ -1,0 +1,17 @@
+---
+# Usage: ansible-playbook -i ../ansible-load-nodes.ini start-reader.yml
+# Or from parent directory: ansible-playbook -i ansible-load-nodes.ini playbooks/start-reader.yml
+- name: Start reader service on load nodes
+  hosts: load_nodes
+  become: true
+  # serial: 1 # Start one host at a time
+  tasks:
+    - name: Start reader service
+      ansible.builtin.systemd:
+        name: reader
+        state: started
+        enabled: yes
+
+    # - name: Wait before starting next host
+    #   ansible.builtin.pause:
+    #     seconds: 2 # Delay in seconds (adjust as needed)
