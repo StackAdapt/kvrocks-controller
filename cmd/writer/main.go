@@ -12,12 +12,19 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/VictoriaMetrics/metrics"
 	"github.com/apache/kvrocks-controller/logger"
 	"github.com/redis/rueidis"
 	"go.uber.org/zap"
 )
 
+var (
+	hSetExpireSeconds     = metrics.GetOrCreateHistogram(`kvrocks_command_seconds{command="hsetexpire"}`)
+	hSetExpireErrorsTotal = metrics.GetOrCreateCounter(`kvrocks_command_errors_total{command="hsetexpire"}`)
+)
+
 func main() {
+	ctx, cancel := context.WithCancel(context.Background())
 	// Define command-line flags
 	numWriters := flag.Int("writers", runtime.GOMAXPROCS(0), "number of writer goroutines")
 	writeDelay := flag.Duration("delay", 0, "delay between writes (e.g., 1ms, 100us)")
@@ -29,6 +36,16 @@ func main() {
 	if numOfWriters <= 0 {
 		numOfWriters = runtime.GOMAXPROCS(0)
 		logger.Get().Warn("invalid number of writers, using default", zap.Int("default", numOfWriters))
+	}
+
+	metricsWg := sync.WaitGroup{}
+	opts := &metrics.PushOptions{
+		WaitGroup: &metricsWg,
+	}
+	err := metrics.InitPushWithOptions(ctx, "http://localhost:9201/metrics", 5*time.Second, true, opts)
+	if err != nil {
+		logger.Get().Error("unable to initialize metrics with push", zap.Error(err))
+		return
 	}
 
 	logger.Get().Info("starting service", zap.Int("writers", numOfWriters), zap.Duration("delay", *writeDelay), zap.Int("start_index", *start))
@@ -43,8 +60,6 @@ func main() {
 		}
 		writers[i] = writer
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
 
 	logger.Get().Info("creating payload")
 	payload := []byte("11123123456789123456712312345678912123123456789123456712312345678912345671231234567891234567123123456789123456734567123123456789123456712312345678912345672312345678912345671231234567891212312345678912345671231234567891234567123123456789123456712312345678912345673456712312345678912345671231234567891234567123123456789123456712312345678912123123456789123456712312345678912345671231234567891234567123123456789123456734567123123456789123456712312345678912345672312345678912345671231234567891212312345678912345671231234567891234567123123456789123456712312345678912345673456712312345678912345671231234567891234567")
@@ -84,6 +99,7 @@ func main() {
 
 	cancel()
 	wg.Wait()
+	metricsWg.Wait()
 
 	// Close all clients
 	logger.Get().Info("closing clients")
@@ -196,6 +212,8 @@ func hSetExpire(
 ) error {
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	start := time.Now()
+	defer hSetExpireSeconds.UpdateDuration(start)
 
 	convertedSlice := make([]string, 0, len(cols)*2)
 	for _, col := range cols {
@@ -213,5 +231,8 @@ func hSetExpire(
 		Build()
 	resp := client.Do(timeoutCtx, cmd)
 	err := resp.Error()
+	if err != nil {
+		hSetExpireErrorsTotal.Inc()
+	}
 	return err
 }

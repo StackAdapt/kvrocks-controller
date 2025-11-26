@@ -6,6 +6,7 @@ replace github.com/redis/rueidis => ../rueidis/
 
 require (
 	github.com/StackAdapt/sa-go-adserver v0.2.619
+	github.com/VictoriaMetrics/metrics v1.38.0
 	github.com/fatih/color v1.18.0
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-playground/validator/v10 v10.26.0
@@ -29,11 +30,9 @@ require (
 )
 
 require (
-	github.com/VictoriaMetrics/metrics v1.38.0 // indirect
 	github.com/rs/zerolog v1.34.0 // indirect
 	github.com/valyala/fastrand v1.1.0 // indirect
 	github.com/valyala/histogram v1.2.0 // indirect
-	gorm.io/gorm v1.25.9 // indirect
 )
 
 require (

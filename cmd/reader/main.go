@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/StackAdapt/sa-go-adserver/logger"
+	"github.com/VictoriaMetrics/metrics"
 	"github.com/redis/rueidis"
 	"go.uber.org/zap"
 )
@@ -36,6 +37,11 @@ func intToAlphabetKey(n int64) string {
 	}
 	return string(result)
 }
+
+var (
+	hGetAllSeconds     = metrics.GetOrCreateHistogram(`kvrocks_command_seconds{command="hgetall"}`)
+	hGetAllErrorsTotal = metrics.GetOrCreateCounter(`kvrocks_command_errors_total{command="hgetall"}`)
+)
 
 func main() {
 	logger.InitLogger(true)
@@ -151,11 +157,14 @@ func hGetAll(
 ) (map[string]string, error) {
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	start := time.Now()
+	defer hGetAllSeconds.UpdateDuration(start)
 
 	cmd := client.B().Hgetall().Key(key).Build()
 	resp := client.Do(timeoutCtx, cmd)
 	data, err := resp.AsStrMap()
 	if err != nil {
+		hGetAllErrorsTotal.Inc()
 		return nil, err
 	}
 

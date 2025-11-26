@@ -5,11 +5,19 @@
   hosts: load_nodes
   become: true
   tasks:
-    - name: Copy writer service to remote hosts
+    # - name: Copy writer service to remote hosts
+    #   ansible.builtin.copy:
+    #     src: /Users/byron.seto/Documents/workspace/third_party/kvrocks-controller/cmd/writer/writer.service
+    #     dest: /etc/systemd/system/writer.service
+    #     mode: "0644"
+    #     owner: root
+    #     group: root
+
+    - name: Copy telegraf service to remote hosts
       ansible.builtin.copy:
-        src: /Users/byron.seto/Documents/workspace/third_party/kvrocks-controller/cmd/writer/writer.service
-        dest: /etc/systemd/system/writer.service
-        mode: "0644"
+        src: /Users/byron.seto/Documents/workspace/third_party/kvrocks-controller/cmd/writer/kvrocks.conf
+        dest: /etc/telegraf/telegraf.d/kvrocks.conf
+        mode: "0755"
         owner: root
         group: root
 
