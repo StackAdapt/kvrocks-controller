@@ -60,25 +60,29 @@ func main() {
 	logger.Info("starting service", zap.Int("readers", *numReaders), zap.Duration("delay", *readDelay), zap.Int("start", *start))
 	// goal is to spam reading and client connections
 
+	// Timeout configuration
+	connWriteTimeout := 10 * time.Second
 	kvRocksLiteReadTimeout := 1500 * time.Millisecond // context timeout
 
 	// Create and increment initialization counter with configuration metrics
 	// Convert delay to milliseconds for readability
 	delayMs := int64(*readDelay / time.Millisecond)
+	connWriteTimeoutMs := int64(connWriteTimeout / time.Millisecond)
+	hGetAllTimeoutMs := int64(kvRocksLiteReadTimeout / time.Millisecond)
 	initCounter := metrics.GetOrCreateCounter(fmt.Sprintf(
-		`kvrocks_reader_initialized_total{readers="%d",delay_ms="%d",start_index="%d"}`,
-		*numReaders, delayMs, *start,
+		`kvrocks_reader_initialized_total{readers="%d",delay_ms="%d",start_index="%d",conn_write_timeout_ms="%d",hgetall_timeout_ms="%d"}`,
+		*numReaders, delayMs, *start, connWriteTimeoutMs, hGetAllTimeoutMs,
 	))
 	initCounter.Inc()
 
 	for i := 0; i < *numReaders; i++ {
 		wg.Add(1)
-		go func(id int, sleep time.Duration, startIndex int) {
+		go func(id int, sleep time.Duration, startIndex int, connTimeout time.Duration, readTimeout time.Duration) {
 			defer wg.Done()
 			client, err := rueidis.NewClient(
 				rueidis.ClientOption{
 					InitAddress:       []string{"kvrocks-byron-test.us-east-1.stackadapt:6379"},
-					ConnWriteTimeout:  10 * time.Second, // explicitly set to the rueidis default; otherwise, it would be computed from Dialer.KeepAlive - e.g 60s * 10
+					ConnWriteTimeout:  connTimeout, // explicitly set to the rueidis default; otherwise, it would be computed from Dialer.KeepAlive - e.g 60s * 10
 					ShuffleInit:       true,
 					Dialer:            net.Dialer{KeepAlive: time.Second * 60}, // To decrease the pings
 					DisableCache:      true,                                    // client cache is not enabled on kvrocks
@@ -110,7 +114,7 @@ func main() {
 				}
 				// Convert integer i to alphabet-only key before passing to hGetAll
 				alphabetKey := intToAlphabetKey(int64(i))
-				_, err := hGetAll(ctx, kvRocksLiteReadTimeout, client, alphabetKey)
+				_, err := hGetAll(ctx, readTimeout, client, alphabetKey)
 				if err != nil {
 					// Check if error is due to context cancellation
 					if ctx.Err() != nil {
@@ -123,7 +127,7 @@ func main() {
 					logger.Info("reading", zap.Int("keyIndex", i), zap.String("key", alphabetKey))
 				}
 			}
-		}(i, *readDelay, *start)
+		}(i, *readDelay, *start, connWriteTimeout, kvRocksLiteReadTimeout)
 	}
 
 	logger.Info("service running, waiting for shutdown signal")

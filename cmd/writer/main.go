@@ -38,6 +38,10 @@ func main() {
 		logger.Get().Warn("invalid number of writers, using default", zap.Int("default", numOfWriters))
 	}
 
+	// Timeout configuration
+	connWriteTimeout := 10 * time.Second
+	hSetExpireTimeout := 1 * time.Second
+
 	metricsWg := sync.WaitGroup{}
 	opts := &metrics.PushOptions{
 		WaitGroup: &metricsWg,
@@ -53,7 +57,7 @@ func main() {
 	writers := make([]*Writer, numOfWriters)
 	for i := 0; i < numOfWriters; i++ {
 		logger.Get().Info("creating writers", zap.Int("num", i))
-		writer, err := NewWriter()
+		writer, err := NewWriter(connWriteTimeout)
 		if err != nil {
 			logger.Get().Error("unable to get rueidis client", zap.Error(err))
 			return
@@ -81,9 +85,11 @@ func main() {
 	// Create and increment initialization counter with configuration metrics
 	// Convert delay to milliseconds for readability
 	delayMs := int64(*writeDelay / time.Millisecond)
+	connWriteTimeoutMs := int64(connWriteTimeout / time.Millisecond)
+	hSetExpireTimeoutMs := int64(hSetExpireTimeout / time.Millisecond)
 	initCounter := metrics.GetOrCreateCounter(fmt.Sprintf(
-		`kvrocks_writer_initialized_total{writers="%d",delay_ms="%d",payload_size_bytes="%d",total_size_per_key_bytes="%d"}`,
-		numOfWriters, delayMs, payloadSize, totalSizePerKey,
+		`kvrocks_writer_initialized_total{writers="%d",delay_ms="%d",payload_size_bytes="%d",total_size_per_key_bytes="%d",conn_write_timeout_ms="%d",hsetexpire_timeout_ms="%d"}`,
+		numOfWriters, delayMs, payloadSize, totalSizePerKey, connWriteTimeoutMs, hSetExpireTimeoutMs,
 	))
 	initCounter.Inc()
 
@@ -92,7 +98,7 @@ func main() {
 	logger.Get().Info("starting writers", zap.Int("start_index", *start))
 	for i, writer := range writers {
 		wg.Add(1)
-		go writer.Start(ctx, &wg, data, cols, *writeDelay, int64(*start), i, numOfWriters)
+		go writer.Start(ctx, &wg, data, cols, *writeDelay, int64(*start), i, numOfWriters, hSetExpireTimeout)
 	}
 
 	logger.Get().Info("service running, waiting for shutdown signal")
@@ -125,12 +131,12 @@ type Writer struct {
 	client rueidis.Client
 }
 
-func NewWriter() (*Writer, error) {
+func NewWriter(connWriteTimeout time.Duration) (*Writer, error) {
 	client, err := rueidis.NewClient(
 		rueidis.ClientOption{
 			InitAddress:       []string{"kvrocks-byron-test.us-east-1.stackadapt:6379"},
 			ShuffleInit:       true,
-			ConnWriteTimeout:  10 * time.Second,
+			ConnWriteTimeout:  connWriteTimeout,
 			DisableCache:      true, // client cache is not enabled on kvrocks
 			PipelineMultiplex: 5,
 			MaxFlushDelay:     50 * time.Microsecond,
@@ -165,7 +171,7 @@ func intToAlphabetKey(n int64) string {
 	return string(result)
 }
 
-func (w *Writer) Start(ctx context.Context, wg *sync.WaitGroup, data map[string][]byte, cols []string, sleep time.Duration, startIndex int64, writerIndex int, numWriters int) {
+func (w *Writer) Start(ctx context.Context, wg *sync.WaitGroup, data map[string][]byte, cols []string, sleep time.Duration, startIndex int64, writerIndex int, numWriters int, hSetExpireTimeout time.Duration) {
 	defer wg.Done()
 	// Each writer starts at startIndex + writerIndex, then increments by numWriters
 	// This ensures no two writers write to the same key
@@ -182,7 +188,7 @@ func (w *Writer) Start(ctx context.Context, wg *sync.WaitGroup, data map[string]
 
 		// Convert integer keyIndex to alphabet-only key before passing to hSetExpire
 		alphabetKey := intToAlphabetKey(keyIndex)
-		err := hSetExpire(ctx, time.Millisecond*1000, w.client, alphabetKey, cols, data, time.Hour*24*7)
+		err := hSetExpire(ctx, hSetExpireTimeout, w.client, alphabetKey, cols, data, time.Hour*24*7)
 		if err != nil {
 			// Check if error is due to context cancellation
 			if ctx.Err() != nil {
