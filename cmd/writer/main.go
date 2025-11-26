@@ -78,6 +78,15 @@ func main() {
 		zap.Int("total_size_per_key_bytes", totalSizePerKey),
 	)
 
+	// Create and increment initialization counter with configuration metrics
+	// Convert delay to milliseconds for readability
+	delayMs := int64(*writeDelay / time.Millisecond)
+	initCounter := metrics.GetOrCreateCounter(fmt.Sprintf(
+		`kvrocks_writer_initialized_total{writers="%d",delay_ms="%d",payload_size_bytes="%d",total_size_per_key_bytes="%d"}`,
+		numOfWriters, delayMs, payloadSize, totalSizePerKey,
+	))
+	initCounter.Inc()
+
 	var wg sync.WaitGroup
 
 	logger.Get().Info("starting writers", zap.Int("start_index", *start))

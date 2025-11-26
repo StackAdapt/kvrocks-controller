@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"net"
 	"os"
 	"os/signal"
@@ -60,6 +61,15 @@ func main() {
 	// goal is to spam reading and client connections
 
 	kvRocksLiteReadTimeout := 1500 * time.Millisecond // context timeout
+
+	// Create and increment initialization counter with configuration metrics
+	// Convert delay to milliseconds for readability
+	delayMs := int64(*readDelay / time.Millisecond)
+	initCounter := metrics.GetOrCreateCounter(fmt.Sprintf(
+		`kvrocks_reader_initialized_total{readers="%d",delay_ms="%d",start_index="%d"}`,
+		*numReaders, delayMs, *start,
+	))
+	initCounter.Inc()
 
 	for i := 0; i < *numReaders; i++ {
 		wg.Add(1)
