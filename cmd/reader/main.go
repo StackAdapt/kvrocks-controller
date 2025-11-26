@@ -53,7 +53,7 @@ func main() {
 	logger.Info("starting service", zap.Int("readers", *numReaders), zap.Duration("delay", *readDelay), zap.Int("start", *start))
 	// goal is to spam reading and client connections
 
-	kvRocksLiteReadTimeout := 5500 * time.Millisecond // context timeout
+	kvRocksLiteReadTimeout := 1500 * time.Millisecond // context timeout
 
 	for i := 0; i < *numReaders; i++ {
 		wg.Add(1)
@@ -61,9 +61,8 @@ func main() {
 			defer wg.Done()
 			client, err := rueidis.NewClient(
 				rueidis.ClientOption{
-					InitAddress: []string{"kvrocks-byron-test.us-east-1.stackadapt:6379"},
-					// ConnWriteTimeout:  10 * time.Second, // explicitly set to the rueidis default; otherwise, it would be computed from Dialer.KeepAlive - e.g 60s * 10
-					ConnWriteTimeout:  time.Millisecond * 100,
+					InitAddress:       []string{"kvrocks-byron-test.us-east-1.stackadapt:6379"},
+					ConnWriteTimeout:  10 * time.Second, // explicitly set to the rueidis default; otherwise, it would be computed from Dialer.KeepAlive - e.g 60s * 10
 					ShuffleInit:       true,
 					Dialer:            net.Dialer{KeepAlive: time.Second * 60}, // To decrease the pings
 					DisableCache:      true,                                    // client cache is not enabled on kvrocks

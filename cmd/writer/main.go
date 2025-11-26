@@ -105,7 +105,7 @@ func NewWriter() (*Writer, error) {
 		rueidis.ClientOption{
 			InitAddress:       []string{"kvrocks-byron-test.us-east-1.stackadapt:6379"},
 			ShuffleInit:       true,
-			ConnWriteTimeout:  time.Millisecond * 2500,
+			ConnWriteTimeout:  10 * time.Second,
 			DisableCache:      true, // client cache is not enabled on kvrocks
 			PipelineMultiplex: 5,
 			MaxFlushDelay:     50 * time.Microsecond,
@@ -157,7 +157,7 @@ func (w *Writer) Start(ctx context.Context, wg *sync.WaitGroup, data map[string]
 
 		// Convert integer keyIndex to alphabet-only key before passing to hSetExpire
 		alphabetKey := intToAlphabetKey(keyIndex)
-		err := hSetExpire(ctx, time.Millisecond*2000, w.client, alphabetKey, cols, data, time.Hour*24*7)
+		err := hSetExpire(ctx, time.Millisecond*1000, w.client, alphabetKey, cols, data, time.Hour*24*7)
 		if err != nil {
 			// Check if error is due to context cancellation
 			if ctx.Err() != nil {

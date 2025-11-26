@@ -7,7 +7,7 @@
   tasks:
     - name: Copy writer service to remote hosts
       ansible.builtin.copy:
-        src: /Users/byron.seto/Documents/workspace/third_party/kvrocks-controller/cmd/reader/writer.service
+        src: /Users/byron.seto/Documents/workspace/third_party/kvrocks-controller/cmd/writer/writer.service
         dest: /etc/systemd/system/writer.service
         mode: "0644"
         owner: root

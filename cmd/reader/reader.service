@@ -4,7 +4,7 @@ After=network-online.target syslog.target remote-fs.target nss-lookup.target sys
 Wants=network-online.target
 
 [Service]
-ExecStart=/home/ec2-user/reader -readers 12 -delay 1ms -start 800000000
+ExecStart=/home/ec2-user/reader -readers 12 -delay 1ms -start 100000000
 
 LimitNOFILE=1048576
 LimitSTACK=16777216
