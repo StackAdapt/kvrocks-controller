@@ -42,7 +42,6 @@ func intToAlphabetKey(n int64) string {
 var (
 	hGetAllSeconds     = metrics.GetOrCreateHistogram(`kvrocks_command_seconds{command="hgetall"}`)
 	hGetAllErrorsTotal = metrics.GetOrCreateCounter(`kvrocks_command_errors_total{command="hgetall"}`)
-	currentIndex       = metrics.GetOrCreateCounter(`kvrocks_command_counter{command="hgetall"}`)
 )
 
 func main() {
@@ -52,13 +51,14 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
 	var clientsMu sync.Mutex
-	var clients []rueidis.Client
+	var clients []Client
 
 	numReaders := flag.Int("readers", runtime.GOMAXPROCS(0), "number of writer goroutines")
 	readDelay := flag.Duration("delay", 0, "delay between writes (e.g., 1ms, 100us)")
 	start := flag.Int("start", 0, "index to start at")
+	clientType := flag.String("client", "rueidis", "client type: rueidis or redis")
 	flag.Parse()
-	logger.Info("starting service", zap.Int("readers", *numReaders), zap.Duration("delay", *readDelay), zap.Int("start", *start))
+	logger.Info("starting service", zap.Int("readers", *numReaders), zap.Duration("delay", *readDelay), zap.Int("start", *start), zap.String("client", *clientType))
 	// goal is to spam reading and client connections
 
 	// Timeout configuration
@@ -81,36 +81,52 @@ func main() {
 	connWriteTimeoutMs := int64(connWriteTimeout / time.Millisecond)
 	hGetAllTimeoutMs := int64(kvRocksLiteReadTimeout / time.Millisecond)
 	initCounter := metrics.GetOrCreateCounter(fmt.Sprintf(
-		`kvrocks_reader_initialized_total{readers="%d",delay_ms="%d",start_index="%d",conn_write_timeout_ms="%d",hgetall_timeout_ms="%d"}`,
-		*numReaders, delayMs, *start, connWriteTimeoutMs, hGetAllTimeoutMs,
+		`kvrocks_reader_initialized_total{readers="%d",delay_ms="%d",start_index="%d",conn_write_timeout_ms="%d",hgetall_timeout_ms="%d",client_type="%s"}`,
+		*numReaders, delayMs, *start, connWriteTimeoutMs, hGetAllTimeoutMs, *clientType,
 	))
 	initCounter.Inc()
 
 	for i := 0; i < *numReaders; i++ {
 		wg.Add(1)
-		go func(id int, sleep time.Duration, startIndex int, connTimeout time.Duration, readTimeout time.Duration) {
+		go func(id int, sleep time.Duration, startIndex int, connTimeout time.Duration, readTimeout time.Duration, clientTypeStr string) {
 			defer wg.Done()
-			client, err := rueidis.NewClient(
-				rueidis.ClientOption{
-					InitAddress:       []string{"kvrocks-byron-test.us-east-1.stackadapt:6379"},
-					ConnWriteTimeout:  connTimeout, // explicitly set to the rueidis default; otherwise, it would be computed from Dialer.KeepAlive - e.g 60s * 10
-					ShuffleInit:       true,
-					Dialer:            net.Dialer{KeepAlive: time.Second * 60}, // To decrease the pings
-					DisableCache:      true,                                    // client cache is not enabled on kvrocks
-					PipelineMultiplex: 5,
-					MaxFlushDelay:     20 * time.Microsecond,
-					AlwaysPipelining:  true,
-					DisableRetry:      true,
-					// ClusterOption: rueidis.ClusterOption{
-					// 	AvoidRefreshOnRedirectMove: true,
-					// },
-					// QueueType: rueidis.QueueTypeFlowBuffer,
-				},
-			)
-			if err != nil {
-				logger.Error("unable to get rueidis client", zap.Error(err), zap.Int("id", id))
-				return
+			var client Client
+
+			switch clientTypeStr {
+			case "redis":
+				client = NewRedisClient(
+					[]string{"kvrocks-byron-test.us-east-1.stackadapt:6379"},
+					connTimeout,
+					readTimeout,
+					connTimeout,
+				)
+			case "rueidis":
+				fallthrough
+			default:
+				rueidisClient, err := rueidis.NewClient(
+					rueidis.ClientOption{
+						InitAddress:       []string{"kvrocks-byron-test.us-east-1.stackadapt:6379"},
+						ConnWriteTimeout:  connTimeout, // explicitly set to the rueidis default; otherwise, it would be computed from Dialer.KeepAlive - e.g 60s * 10
+						ShuffleInit:       true,
+						Dialer:            net.Dialer{KeepAlive: time.Second * 60}, // To decrease the pings
+						DisableCache:      true,                                    // client cache is not enabled on kvrocks
+						PipelineMultiplex: 5,
+						MaxFlushDelay:     20 * time.Microsecond,
+						AlwaysPipelining:  true,
+						DisableRetry:      true,
+						// ClusterOption: rueidis.ClusterOption{
+						// 	AvoidRefreshOnRedirectMove: true,
+						// },
+						// QueueType: rueidis.QueueTypeFlowBuffer,
+					},
+				)
+				if err != nil {
+					logger.Error("unable to get rueidis client", zap.Error(err), zap.Int("id", id))
+					return
+				}
+				client = NewRueidisClientFromClient(rueidisClient)
 			}
+
 			clientsMu.Lock()
 			clients = append(clients, client)
 			clientsMu.Unlock()
@@ -138,7 +154,7 @@ func main() {
 					logger.Info("reading", zap.Int("keyIndex", i), zap.String("key", alphabetKey))
 				}
 			}
-		}(i, *readDelay, *start, connWriteTimeout, kvRocksLiteReadTimeout)
+		}(i, *readDelay, *start, connWriteTimeout, kvRocksLiteReadTimeout, *clientType)
 	}
 
 	logger.Info("service running, waiting for shutdown signal")
@@ -178,7 +194,7 @@ func main() {
 func hGetAll(
 	ctx context.Context,
 	timeout time.Duration,
-	client rueidis.Client,
+	client Client,
 	key string,
 ) (map[string]string, error) {
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
@@ -186,9 +202,7 @@ func hGetAll(
 	start := time.Now()
 	defer hGetAllSeconds.UpdateDuration(start)
 
-	cmd := client.B().Hgetall().Key(key).Build()
-	resp := client.Do(timeoutCtx, cmd)
-	data, err := resp.AsStrMap()
+	data, err := client.HGetAll(timeoutCtx, key)
 	if err != nil {
 		hGetAllErrorsTotal.Inc()
 		return nil, err
