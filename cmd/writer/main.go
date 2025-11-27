@@ -21,6 +21,7 @@ import (
 var (
 	hSetExpireSeconds     = metrics.GetOrCreateHistogram(`kvrocks_command_seconds{command="hsetexpire"}`)
 	hSetExpireErrorsTotal = metrics.GetOrCreateCounter(`kvrocks_command_errors_total{command="hsetexpire"}`)
+	currentIndex          = metrics.GetOrCreateCounter(`kvrocks_command_counter{command="hsetexpire"}`)
 )
 
 func main() {
@@ -70,7 +71,7 @@ func main() {
 	payloadSize := len(payload)
 	data := make(map[string][]byte)
 	cols := []string{}
-	for i := 0; i < 300; i++ {
+	for i := 0; i < 8; i++ {
 		data[fmt.Sprintf("%d", i)] = payload
 		cols = append(cols, fmt.Sprintf("%d", i))
 	}
@@ -88,8 +89,8 @@ func main() {
 	connWriteTimeoutMs := int64(connWriteTimeout / time.Millisecond)
 	hSetExpireTimeoutMs := int64(hSetExpireTimeout / time.Millisecond)
 	initCounter := metrics.GetOrCreateCounter(fmt.Sprintf(
-		`kvrocks_writer_initialized_total{writers="%d",delay_ms="%d",payload_size_bytes="%d",total_size_per_key_bytes="%d",conn_write_timeout_ms="%d",hsetexpire_timeout_ms="%d"}`,
-		numOfWriters, delayMs, payloadSize, totalSizePerKey, connWriteTimeoutMs, hSetExpireTimeoutMs,
+		`kvrocks_writer_initialized_total{writers="%d",delay_ms="%d",payload_size_bytes="%d",total_size_per_key_bytes="%d",conn_write_timeout_ms="%d",hsetexpire_timeout_ms="%d", start_index="%d"}`,
+		numOfWriters, delayMs, payloadSize, totalSizePerKey, connWriteTimeoutMs, hSetExpireTimeoutMs, *start,
 	))
 	initCounter.Inc()
 

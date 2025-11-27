@@ -42,6 +42,7 @@ func intToAlphabetKey(n int64) string {
 var (
 	hGetAllSeconds     = metrics.GetOrCreateHistogram(`kvrocks_command_seconds{command="hgetall"}`)
 	hGetAllErrorsTotal = metrics.GetOrCreateCounter(`kvrocks_command_errors_total{command="hgetall"}`)
+	currentIndex       = metrics.GetOrCreateCounter(`kvrocks_command_counter{command="hgetall"}`)
 )
 
 func main() {
@@ -63,6 +64,16 @@ func main() {
 	// Timeout configuration
 	connWriteTimeout := 10 * time.Second
 	kvRocksLiteReadTimeout := 1500 * time.Millisecond // context timeout
+
+	metricsWg := sync.WaitGroup{}
+	opts := &metrics.PushOptions{
+		WaitGroup: &metricsWg,
+	}
+	err := metrics.InitPushWithOptions(ctx, "http://localhost:9201/metrics", 5*time.Second, true, opts)
+	if err != nil {
+		logger.Error("unable to initialize metrics with push", zap.Error(err))
+		return
+	}
 
 	// Create and increment initialization counter with configuration metrics
 	// Convert delay to milliseconds for readability
@@ -146,6 +157,7 @@ func main() {
 
 	// Wait for all readers to finish
 	wg.Wait()
+	metricsWg.Wait()
 
 	// Close all clients
 	logger.Info("closing clients")

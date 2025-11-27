@@ -1,0 +1,20 @@
+---
+# Usage: ansible-playbook -i ../ansible-load-nodes.ini copy-reader.yml
+# Or from parent directory: ansible-playbook -i ansible-load-nodes.ini playbooks/copy-reader.yml
+- name: Copy writer binary to load nodes
+  hosts: load_nodes
+  become: true
+  tasks:
+    - name: Copy telegraf service to remote hosts
+      ansible.builtin.copy:
+        src: /Users/byron.seto/Documents/workspace/third_party/kvrocks-controller/cmd/reader/kvrocks.conf
+        dest: /etc/telegraf/telegraf.d/kvrocks.conf
+        mode: "0755"
+        owner: root
+        group: root
+
+    - name: Restart telegraf service
+      ansible.builtin.systemd:
+        name: telegraf
+        state: restarted
+        enabled: yes
