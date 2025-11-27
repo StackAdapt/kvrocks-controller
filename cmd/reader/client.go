@@ -24,5 +24,6 @@ type Client interface {
 
 	// Close closes the client connection
 	Close()
-}
 
+	Name() string
+}

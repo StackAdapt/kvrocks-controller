@@ -39,11 +39,6 @@ func intToAlphabetKey(n int64) string {
 	return string(result)
 }
 
-var (
-	hGetAllSeconds     = metrics.GetOrCreateHistogram(`kvrocks_command_seconds{command="hgetall"}`)
-	hGetAllErrorsTotal = metrics.GetOrCreateCounter(`kvrocks_command_errors_total{command="hgetall"}`)
-)
-
 func main() {
 	logger.InitLogger(true)
 	logger.InitNewLogger(true)
@@ -200,11 +195,12 @@ func hGetAll(
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	start := time.Now()
+	hGetAllSeconds := metrics.GetOrCreateHistogram(fmt.Sprintf(`kvrocks_command_seconds{command="hgetall",client="%s"}`, client.Name()))
 	defer hGetAllSeconds.UpdateDuration(start)
 
 	data, err := client.HGetAll(timeoutCtx, key)
 	if err != nil {
-		hGetAllErrorsTotal.Inc()
+		metrics.GetOrCreateCounter(fmt.Sprintf(`kvrocks_command_errors_total{command="hgetall",client="%s"}`, client.Name())).Inc()
 		return nil, err
 	}
 

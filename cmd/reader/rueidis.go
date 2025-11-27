@@ -13,6 +13,10 @@ type RueidisClient struct {
 	client rueidis.Client
 }
 
+func (r *RueidisClient) Name() string {
+	return "rueidis"
+}
+
 func NewRueidisClient(options rueidis.ClientOption) (*RueidisClient, error) {
 	client, err := rueidis.NewClient(options)
 	if err != nil {
@@ -87,4 +91,3 @@ func (r *RueidisClient) HSetExpire(ctx context.Context, key string, cols []strin
 func (r *RueidisClient) Close() {
 	r.client.Close()
 }
-

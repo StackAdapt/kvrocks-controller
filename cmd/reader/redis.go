@@ -23,6 +23,10 @@ func NewRedisClient(addrs []string, writeTimeout, readTimeout, dialTimeout time.
 	}
 }
 
+func (r *RedisClient) Name() string {
+	return "redis"
+}
+
 func (r *RedisClient) Hmget(ctx context.Context, key string, fields ...string) ([]interface{}, error) {
 	result, err := r.clusterClient.HMGet(ctx, key, fields...).Result()
 	return result, err
