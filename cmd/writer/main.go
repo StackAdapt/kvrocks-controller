@@ -4,10 +4,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"runtime"
-	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -18,18 +18,13 @@ import (
 	"go.uber.org/zap"
 )
 
-var (
-	hSetExpireSeconds     = metrics.GetOrCreateHistogram(`kvrocks_command_seconds{command="hsetexpire"}`)
-	hSetExpireErrorsTotal = metrics.GetOrCreateCounter(`kvrocks_command_errors_total{command="hsetexpire"}`)
-	currentIndex          = metrics.GetOrCreateCounter(`kvrocks_command_counter{command="hsetexpire"}`)
-)
-
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	// Define command-line flags
 	numWriters := flag.Int("writers", runtime.GOMAXPROCS(0), "number of writer goroutines")
 	writeDelay := flag.Duration("delay", 0, "delay between writes (e.g., 1ms, 100us)")
 	start := flag.Int("start", 0, "index to start at")
+	clientType := flag.String("client", "rueidis", "client type: rueidis or redis")
 
 	flag.Parse()
 
@@ -53,14 +48,14 @@ func main() {
 		return
 	}
 
-	logger.Get().Info("starting service", zap.Int("writers", numOfWriters), zap.Duration("delay", *writeDelay), zap.Int("start_index", *start))
+	logger.Get().Info("starting service", zap.Int("writers", numOfWriters), zap.Duration("delay", *writeDelay), zap.Int("start_index", *start), zap.String("client", *clientType))
 
 	writers := make([]*Writer, numOfWriters)
 	for i := 0; i < numOfWriters; i++ {
 		logger.Get().Info("creating writers", zap.Int("num", i))
-		writer, err := NewWriter(connWriteTimeout)
+		writer, err := NewWriter(connWriteTimeout, *clientType)
 		if err != nil {
-			logger.Get().Error("unable to get rueidis client", zap.Error(err))
+			logger.Get().Error("unable to get client", zap.Error(err), zap.String("client_type", *clientType))
 			return
 		}
 		writers[i] = writer
@@ -89,8 +84,8 @@ func main() {
 	connWriteTimeoutMs := int64(connWriteTimeout / time.Millisecond)
 	hSetExpireTimeoutMs := int64(hSetExpireTimeout / time.Millisecond)
 	initCounter := metrics.GetOrCreateCounter(fmt.Sprintf(
-		`kvrocks_writer_initialized_total{writers="%d",delay_ms="%d",payload_size_bytes="%d",total_size_per_key_bytes="%d",conn_write_timeout_ms="%d",hsetexpire_timeout_ms="%d", start_index="%d"}`,
-		numOfWriters, delayMs, payloadSize, totalSizePerKey, connWriteTimeoutMs, hSetExpireTimeoutMs, *start,
+		`kvrocks_writer_initialized_total{writers="%d",delay_ms="%d",payload_size_bytes="%d",total_size_per_key_bytes="%d",conn_write_timeout_ms="%d",hsetexpire_timeout_ms="%d",start_index="%d",client_type="%s"}`,
+		numOfWriters, delayMs, payloadSize, totalSizePerKey, connWriteTimeoutMs, hSetExpireTimeoutMs, *start, *clientType,
 	))
 	initCounter.Inc()
 
@@ -129,26 +124,46 @@ func main() {
 }
 
 type Writer struct {
-	client rueidis.Client
+	client Client
 }
 
-func NewWriter(connWriteTimeout time.Duration) (*Writer, error) {
-	client, err := rueidis.NewClient(
-		rueidis.ClientOption{
-			InitAddress:       []string{"kvrocks-byron-test.us-east-1.stackadapt:6379"},
-			ShuffleInit:       true,
-			ConnWriteTimeout:  connWriteTimeout,
-			DisableCache:      true, // client cache is not enabled on kvrocks
-			PipelineMultiplex: 5,
-			MaxFlushDelay:     50 * time.Microsecond,
-			AlwaysPipelining:  true,
-			DisableTCPNoDelay: true,
-			DisableRetry:      true,
-		},
-	)
+func NewWriter(connWriteTimeout time.Duration, clientType string) (*Writer, error) {
+	var client Client
+
+	switch clientType {
+	case "redis":
+		client = NewRedisClient(
+			[]string{"kvrocks-byron-test.us-east-1.stackadapt:6379"},
+			connWriteTimeout,
+			connWriteTimeout,
+			connWriteTimeout,
+		)
+	case "rueidis":
+		fallthrough
+	default:
+		rueidisClient, err := rueidis.NewClient(
+			rueidis.ClientOption{
+				InitAddress:       []string{"kvrocks-byron-test.us-east-1.stackadapt:6379"},
+				ShuffleInit:       true,
+				ConnWriteTimeout:  connWriteTimeout,
+				Dialer:            net.Dialer{KeepAlive: time.Second * 60}, // To decrease the pings
+				DisableCache:      true,                                    // client cache is not enabled on kvrocks
+				PipelineMultiplex: 5,
+				MaxFlushDelay:     50 * time.Microsecond,
+				AlwaysPipelining:  true,
+				DisableTCPNoDelay: true,
+				DisableRetry:      true,
+			},
+		)
+		if err != nil {
+			return nil, err
+		}
+		client = NewRueidisClientFromClient(rueidisClient)
+	}
+
 	return &Writer{
 		client: client,
-	}, err
+	}, nil
 }
 
 // intToAlphabetKey converts an integer to an alphabet-only string using bijective base-26 encoding
@@ -220,7 +235,7 @@ func (w *Writer) Start(ctx context.Context, wg *sync.WaitGroup, data map[string]
 func hSetExpire(
 	ctx context.Context,
 	timeout time.Duration,
-	client rueidis.Client,
+	client Client,
 	key string,
 	cols []string,
 	data map[string][]byte,
@@ -229,26 +244,18 @@ func hSetExpire(
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	start := time.Now()
+	hSetExpireSeconds := metrics.GetOrCreateHistogram(fmt.Sprintf(`kvrocks_command_seconds{command="hsetexpire",conn_client="%s"}`, client.Name()))
 	defer hSetExpireSeconds.UpdateDuration(start)
 
-	convertedSlice := make([]string, 0, len(cols)*2)
-	for _, col := range cols {
-		if _, ok := data[col]; !ok {
-			return fmt.Errorf("field %s not found in data", col)
-		}
-		convertedSlice = append(convertedSlice, col, string(data[col]))
+	// Convert map[string][]byte to map[string]string
+	stringData := make(map[string]string, len(data))
+	for col, val := range data {
+		stringData[col] = string(val)
 	}
 
-	cmd := client.B().
-		Arbitrary("HSETEXPIRE").
-		Keys(key).
-		Args(strconv.Itoa(int(ttl.Seconds()))).
-		Args(convertedSlice...).
-		Build()
-	resp := client.Do(timeoutCtx, cmd)
-	err := resp.Error()
+	err := client.HSetExpire(timeoutCtx, key, cols, stringData, ttl)
 	if err != nil {
-		hSetExpireErrorsTotal.Inc()
+		metrics.GetOrCreateCounter(fmt.Sprintf(`kvrocks_command_errors_total{command="hsetexpire",conn_client="%s"}`, client.Name())).Inc()
 	}
 	return err
 }
