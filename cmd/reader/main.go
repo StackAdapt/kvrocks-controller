@@ -195,12 +195,12 @@ func hGetAll(
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	start := time.Now()
-	hGetAllSeconds := metrics.GetOrCreateHistogram(fmt.Sprintf(`kvrocks_command_seconds{command="hgetall",client="%s"}`, client.Name()))
+	hGetAllSeconds := metrics.GetOrCreateHistogram(fmt.Sprintf(`kvrocks_command_seconds{command="hgetall",conn_client="%s"}`, client.Name()))
 	defer hGetAllSeconds.UpdateDuration(start)
 
 	data, err := client.HGetAll(timeoutCtx, key)
 	if err != nil {
-		metrics.GetOrCreateCounter(fmt.Sprintf(`kvrocks_command_errors_total{command="hgetall",client="%s"}`, client.Name())).Inc()
+		metrics.GetOrCreateCounter(fmt.Sprintf(`kvrocks_command_errors_total{command="hgetall",conn_client="%s"}`, client.Name())).Inc()
 		return nil, err
 	}
 
