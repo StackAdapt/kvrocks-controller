@@ -1,0 +1,11 @@
+---
+# Usage: ansible-playbook -i ../ansible-load-nodes.ini stop-reader.yml
+# Or from parent directory: ansible-playbook -i ansible-load-nodes.ini playbooks/stop-reader.yml
+- name: Stop kvrocks service on nodes
+  hosts: nodes
+  become: true
+  tasks:
+    - name: Stop kvrocks service
+      ansible.builtin.systemd:
+        name: kvrocks
+        state: stopped

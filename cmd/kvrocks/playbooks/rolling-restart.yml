@@ -1,0 +1,32 @@
+---
+# Usage: ansible-playbook -i ../ansible-load-nodes.ini rolling-restart.yml
+# Or from parent directory: ansible-playbook -i ansible-load-nodes.ini playbooks/rolling-restart.yml
+- name: Rolling restart kvrocks with dev-ops update
+  hosts: nodes
+  become: true
+  serial: 1 # One host at a time
+  vars:
+    devops_branch: "bseto/DB-492-kvrocks-topo-change"
+    pause_seconds: 10 # Delay between nodes (adjust as needed)
+
+  tasks:
+    - name: Fetch latest from origin
+      ansible.builtin.shell: |
+        cd ~/dev-ops && git fetch origin
+      become: false
+
+    - name: Checkout branch
+      ansible.builtin.shell: |
+        cd ~/dev-ops && git checkout {{ devops_branch }} && git pull origin {{ devops_branch }}
+      become: false
+
+    - name: Restart kvrocks service
+      ansible.builtin.systemd:
+        name: kvrocks
+        state: restarted
+        enabled: yes
+
+    - name: Pause before next host
+      ansible.builtin.pause:
+        seconds: "{{ pause_seconds }}"
+      when: inventory_hostname != ansible_play_hosts_all[-1] # Skip pause on last host
