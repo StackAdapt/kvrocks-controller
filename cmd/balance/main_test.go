@@ -370,3 +370,94 @@ func TestCalculateBalancePlanPreservesAllSlots(t *testing.T) {
 		t.Errorf("Total slots after migration = %d, expected 16384", total)
 	}
 }
+
+// TestMigrationSlotsAreValidSubsetOfSource verifies that each migration's slot range
+// only contains slots that the source shard actually owns. This prevents invalid migrations
+// like "migrate 0-150" when shard A only has slots 0-100 and shard B has 101-200.
+func TestMigrationSlotsAreValidSubsetOfSource(t *testing.T) {
+	tests := []struct {
+		name    string
+		cluster *store.Cluster
+	}{
+		{
+			name: "two shards with contiguous ranges, add one empty",
+			cluster: &store.Cluster{
+				Shards: []*store.Shard{
+					{SlotRanges: []store.SlotRange{{Start: 0, Stop: 100}}},
+					{SlotRanges: []store.SlotRange{{Start: 101, Stop: 200}}},
+					{SlotRanges: []store.SlotRange{}}, // new empty shard
+				},
+			},
+		},
+		{
+			name: "three shards with gaps, add two empty",
+			cluster: &store.Cluster{
+				Shards: []*store.Shard{
+					{SlotRanges: []store.SlotRange{{Start: 0, Stop: 5460}}},
+					{SlotRanges: []store.SlotRange{{Start: 5461, Stop: 10921}}},
+					{SlotRanges: []store.SlotRange{{Start: 10922, Stop: 16383}}},
+					{SlotRanges: []store.SlotRange{}},
+					{SlotRanges: []store.SlotRange{}},
+				},
+			},
+		},
+		{
+			name: "shard with multiple non-contiguous ranges",
+			cluster: &store.Cluster{
+				Shards: []*store.Shard{
+					{SlotRanges: []store.SlotRange{
+						{Start: 0, Stop: 100},
+						{Start: 500, Stop: 600},
+						{Start: 1000, Stop: 1100},
+					}},
+					{SlotRanges: []store.SlotRange{
+						{Start: 101, Stop: 499},
+						{Start: 601, Stop: 999},
+						{Start: 1101, Stop: 16383},
+					}},
+					{SlotRanges: []store.SlotRange{}},
+				},
+			},
+		},
+		{
+			name: "heavily imbalanced - one shard has almost all slots",
+			cluster: &store.Cluster{
+				Shards: []*store.Shard{
+					{SlotRanges: []store.SlotRange{{Start: 0, Stop: 16000}}},
+					{SlotRanges: []store.SlotRange{{Start: 16001, Stop: 16383}}},
+					{SlotRanges: []store.SlotRange{}},
+					{SlotRanges: []store.SlotRange{}},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			plan := calculateBalancePlan(tt.cluster)
+
+			// Build a set of slots owned by each shard
+			shardSlots := make([]map[int]bool, len(tt.cluster.Shards))
+			for i, shard := range tt.cluster.Shards {
+				shardSlots[i] = make(map[int]bool)
+				for _, sr := range shard.SlotRanges {
+					for s := sr.Start; s <= sr.Stop; s++ {
+						shardSlots[i][s] = true
+					}
+				}
+			}
+
+			// Verify each migration only contains slots from source shard
+			for batchIdx, batch := range plan.Batches {
+				for migIdx, m := range batch.Migrations {
+					for slot := m.Slots.Start; slot <= m.Slots.Stop; slot++ {
+						if !shardSlots[m.SourceShard][slot] {
+							t.Errorf("batch[%d] migration[%d]: slot %d is not owned by source shard %d (range %d-%d)",
+								batchIdx, migIdx, slot, m.SourceShard, m.Slots.Start, m.Slots.Stop)
+						}
+					}
+				}
+			}
+		})
+	}
+}
