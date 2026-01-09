@@ -1,0 +1,13 @@
+---
+- name: Copy kvrocks binary
+  hosts: nodes
+  become: true
+  tasks:
+    - name: Copy kvrocks binary to remote hosts
+      ansible.builtin.copy:
+        src: /Users/byron.seto/Documents/workspace/third_party/kvrocks-controller/cmd/kvrocks/kvrocks-2.14.0
+        dest: /home/ec2-user/kvrocks-2.14.0
+        mode: "0755"
+        owner: root
+        group: root
+        backup: true

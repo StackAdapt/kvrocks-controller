@@ -1,0 +1,20 @@
+---
+# Usage: ansible-playbook -i ../ansible-load-nodes.ini rolling-restart.yml
+# Or from parent directory: ansible-playbook -i ansible-load-nodes.ini playbooks/rolling-restart.yml
+- name: Rolling restart kvrocks with dev-ops update
+  hosts: nodes
+  become: true
+  serial: 1 # One host at a time
+  vars:
+    pause_seconds: 1 # Delay between nodes (adjust as needed)
+
+  tasks:
+    - name: Set Config to yes
+      ansible.builtin.shell: |
+        redis6-cli CONFIG SET persist-cluster-nodes-enabled no
+      become: false
+
+    - name: Pause before next host
+      ansible.builtin.pause:
+        seconds: "{{ pause_seconds }}"
+      when: inventory_hostname != ansible_play_hosts_all[-1] # Skip pause on last host

@@ -1,19 +1,21 @@
 {
-  "version": 214,
-  "name": "us-east-1",
+  "version": 114,
+  "name": "ap-southeast-1",
   "shards": [
     {
       "nodes": [
         {
-          "addr": "172.30.77.133:6379",
-          "created_at": 1752781254,
-          "id": "VM98ROf7DH9FxnNKIW2e9rVKv49UYugVRLr9jBuW",
+          "addr": "172.19.63.126:6379",
+          "created_at": 0,
+          "id": "5AQxPDM9U1KcjPim30JvjvwBDswC0chUk8yx010h",
           "password": "",
           "role": "master"
         }
       ],
       "slot_ranges": [
-        "0-382"
+        "0-1364",
+        "13650-13799",
+        "15015-15138"
       ],
       "target_shard_index": -1,
       "migrating_slot": null
@@ -21,15 +23,17 @@
     {
       "nodes": [
         {
-          "addr": "172.30.93.111:6379",
-          "created_at": 1752781775,
-          "id": "Fv9N4pOFBTS8QhAbYCllCwDBtcgtFYBlmx75q8Nt",
+          "addr": "172.19.32.148:6379",
+          "created_at": 0,
+          "id": "AVENhjyjSH6WemP2nodFYg1sD6VtBqmw5Z8w5rZZ",
           "password": "",
           "role": "master"
         }
       ],
       "slot_ranges": [
-        "564-947"
+        "1365-2729",
+        "13800-13949",
+        "15139-15262"
       ],
       "target_shard_index": -1,
       "migrating_slot": null
@@ -37,15 +41,17 @@
     {
       "nodes": [
         {
-          "addr": "172.30.66.110:6379",
-          "created_at": 1752784579,
-          "id": "0Kr0Rl47gNxmXHpgcA1BubiENJho6HYkfJ5ZFpkR",
+          "addr": "172.19.5.174:6379",
+          "created_at": 0,
+          "id": "PIliQjgUrk4FOapKbdhJGhNcpYrggxMZwTdC5RqH",
           "password": "",
           "role": "master"
         }
       ],
       "slot_ranges": [
-        "1128-1511"
+        "2730-4094",
+        "13950-14099",
+        "15263-15386"
       ],
       "target_shard_index": -1,
       "migrating_slot": null
@@ -53,15 +59,17 @@
     {
       "nodes": [
         {
-          "addr": "172.30.69.200:6379",
-          "created_at": 1752784639,
-          "id": "mZkXY4zSfLNOTIFecLUHeRGNAyOqQshPjhZMn2eU",
+          "addr": "172.19.11.151:6379",
+          "created_at": 0,
+          "id": "4w8hqtiXnnBQ6MhJqJ5aBrHaqyOMvh2OEokiXlx0",
           "password": "",
           "role": "master"
         }
       ],
       "slot_ranges": [
-        "1692-2075"
+        "4095-5459",
+        "14100-14249",
+        "15387-15510"
       ],
       "target_shard_index": -1,
       "migrating_slot": null
@@ -69,15 +77,17 @@
     {
       "nodes": [
         {
-          "addr": "172.30.64.13:6379",
-          "created_at": 1752784650,
-          "id": "igaSNvfTX0flnabEoPTuCSNtdhZt0fkOz8Nj55ZA",
+          "addr": "172.19.22.228:6379",
+          "created_at": 0,
+          "id": "V44eZ2l7260Qg14uwatHNH1RnejH3HyJWL9LL4WU",
           "password": "",
           "role": "master"
         }
       ],
       "slot_ranges": [
-        "2256-2639"
+        "5460-6824",
+        "14250-14398",
+        "15511-15634"
       ],
       "target_shard_index": -1,
       "migrating_slot": null
@@ -85,15 +95,17 @@
     {
       "nodes": [
         {
-          "addr": "172.30.76.164:6379",
-          "created_at": 1752784990,
-          "id": "jPt6McjMx9bOvR6xw0z0hViGNyxG5a70472o2bEa",
+          "addr": "172.19.44.175:6379",
+          "created_at": 0,
+          "id": "C79fTLdQUz7jWpwmOTX9d2hYVTRSJ88tPpoIJ8wQ",
           "password": "",
           "role": "master"
         }
       ],
       "slot_ranges": [
-        "2820-3203"
+        "6825-8189",
+        "14399-14547",
+        "15635-15758"
       ],
       "target_shard_index": -1,
       "migrating_slot": null
@@ -101,15 +113,17 @@
     {
       "nodes": [
         {
-          "addr": "172.30.81.42:6379",
-          "created_at": 1752785214,
-          "id": "04uNR2kfV6mvt6QgpVAOhE7WFFFzWpeoxSK03tzq",
+          "addr": "172.19.23.31:6379",
+          "created_at": 0,
+          "id": "dMvpzWXKQsGtrxNDbeqO0r0rjj947GmZtD17kXDl",
           "password": "",
           "role": "master"
         }
       ],
       "slot_ranges": [
-        "3384-3767"
+        "8190-9554",
+        "14548-14696",
+        "15759-15882"
       ],
       "target_shard_index": -1,
       "migrating_slot": null
@@ -117,15 +131,17 @@
     {
       "nodes": [
         {
-          "addr": "172.30.65.108:6379",
-          "created_at": 1752785228,
-          "id": "2G9M1UpTvp7QS1CokBy9CWcubC32sIGd1u1G0qNu",
+          "addr": "172.19.28.85:6379",
+          "created_at": 0,
+          "id": "wRQ601vOjr82ZVQ3fGqRcSt2UIRFEhAVSG8jiKvB",
           "password": "",
           "role": "master"
         }
       ],
       "slot_ranges": [
-        "3948-4331"
+        "9555-10919",
+        "14697-14845",
+        "15883-16006"
       ],
       "target_shard_index": -1,
       "migrating_slot": null
@@ -133,15 +149,17 @@
     {
       "nodes": [
         {
-          "addr": "172.30.75.232:6379",
-          "created_at": 1752785240,
-          "id": "mgRy5vz8OMvKcvgoZQgbFIp6JwybhBZiG0bhR0cG",
+          "addr": "172.19.10.163:6379",
+          "created_at": 0,
+          "id": "Xpbl8cN7jsqEgX3OnKalxOPj4WnmFzn1nBF4uOO5",
           "password": "",
           "role": "master"
         }
       ],
       "slot_ranges": [
-        "4512-4895"
+        "10920-12284",
+        "14846-14994",
+        "16007-16130"
       ],
       "target_shard_index": -1,
       "migrating_slot": null
@@ -149,15 +167,17 @@
     {
       "nodes": [
         {
-          "addr": "172.30.68.126:6379",
-          "created_at": 1752785253,
-          "id": "2ScALEDbAYBfbNpJXRwvxdKJqgw1dUbbUCtVrmCc",
+          "addr": "172.19.57.39:6379",
+          "created_at": 0,
+          "id": "6j4MCRTb1ViXp0RBx1cDCrPAtNbiGzAyfmNf1Zs3",
           "password": "",
           "role": "master"
         }
       ],
       "slot_ranges": [
-        "5102-5459"
+        "12285-13649",
+        "14995-15014",
+        "16131-16383"
       ],
       "target_shard_index": -1,
       "migrating_slot": null
@@ -165,607 +185,33 @@
     {
       "nodes": [
         {
-          "addr": "172.30.71.164:6379",
-          "created_at": 1752785264,
-          "id": "m2UlcMyoUUBeJQYjlNheom0veO2ygTBvooGZtDXr",
+          "addr": "172.19.63.1:6379",
+          "created_at": 1767826170,
+          "id": "zcg2nbG390h6lanSprzDhDoLhyeRXQ3mnTO3rAST",
           "password": "",
           "role": "master"
         }
       ],
-      "slot_ranges": [
-        "5640-6021"
-      ],
+      "slot_ranges": [],
       "target_shard_index": -1,
       "migrating_slot": null
     },
     {
       "nodes": [
         {
-          "addr": "172.30.89.105:6379",
-          "created_at": 1752785273,
-          "id": "m4QNSM4ywDFb1mC4LpZmb1rCOFoZVzU2tr3XK0oU",
+          "addr": "172.19.14.119:6379",
+          "created_at": 1767826260,
+          "id": "la9YxVcwJP0o27fHt33cxiIQkNEqSp9EERZGc73B",
           "password": "",
           "role": "master"
         }
       ],
-      "slot_ranges": [
-        "6204-6587"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.75.139:6379",
-          "created_at": 1752785284,
-          "id": "dBsHuq91rfcOFucLGQrj8ppuPZmdjo7TBeMVonjn",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "6768-7151"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.69.46:6379",
-          "created_at": 1752785295,
-          "id": "fNhyR7WuTE0IBuMScqdN0ev7VdbKgAXm4jLTyzOe",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "7332-7715"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.71.57:6379",
-          "created_at": 1752785311,
-          "id": "PoqgmCX3L3xQKApbTmmFT13LyqJaao6Dn7UqG0je",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "7896-8279"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.67.156:6379",
-          "created_at": 1752785324,
-          "id": "rksnONieb40uTzfHk4jjZOvKkYmuXpI2zspjvfdj",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "8460-8843"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.72.207:6379",
-          "created_at": 1752785337,
-          "id": "LmeDjDU1B8v9QhCjfatOw2HEGukdhPMXu0uSrHhw",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "9024-9407"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.85.223:6379",
-          "created_at": 1752785348,
-          "id": "mMastDY0crUiDfZdWqtJoxCleheS0ZwwQ7X6s12z",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "9588-9971"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.95.191:6379",
-          "created_at": 1752785362,
-          "id": "IZB69ypbsWGGYWuIAVPetuTYo751aWycZ9z0iamY",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "10178-10535"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.84.109:6379",
-          "created_at": 1752785375,
-          "id": "TNnJihA3k03qHzBRotJSZXz1lEAuHh8lublNKPng",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "10742-11099"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.77.90:6379",
-          "created_at": 1752785391,
-          "id": "DNCW6xf1ee4y7E23ToUklVztTWpvyb46HiE80HZv",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "11280-11661"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.89.89:6379",
-          "created_at": 1752785406,
-          "id": "gkVatJyzchtyQeKQ1LkisdJvF7RI9q05TTaoazAe",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "11844-12227"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.91.139:6379",
-          "created_at": 1752785427,
-          "id": "cbqBXWqNAjlWKNFog5d8lyHWZ4RCRsHZbRdvHKfq",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "12408-12791"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.95.175:6379",
-          "created_at": 1752785446,
-          "id": "X5Iif2gAKCmVsi3BHAcdL32q1imNOHOzqiukf3Mn",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "12972-13355"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.68.166:6379",
-          "created_at": 1752785457,
-          "id": "MxQ9xPkQoLfU3JSVICcpVVVGLTawPonj9uVoH09h",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "13536-13919"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.95.247:6379",
-          "created_at": 1752785472,
-          "id": "YDAcU3srM7d6iMyOX44rIuKp59fUEM9IoA0t49gv",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "14100-14483"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.82.74:6379",
-          "created_at": 1752785484,
-          "id": "i7yZWYeTwo1reuVEQlidR57b41GNkf18NwHvnRDr",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "14664-15047"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.93.235:6379",
-          "created_at": 1752785496,
-          "id": "GP9hDpeVSOkne8J9mTKzGJcGDh42TiwrsLDyAPPH",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "15228-15611"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.92.246:6379",
-          "created_at": 1752785508,
-          "id": "skRCcGAVrTSJWQZuX0EMTBpraqiHcaRRcSwcrtOw",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "15792-16171"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.88.28:6379",
-          "created_at": 1753304744,
-          "id": "3evYjrs8hsadClVeuIFKboaA33Vemh4xQmbAhQbI",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "423-563",
-        "987-1127",
-        "1551-1652"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.91.167:6379",
-          "created_at": 1753305101,
-          "id": "20zfuL34r6K6uqPK1daOWtENLn1CkH4C1OnLvALe",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "2115-2255",
-        "2679-2819",
-        "3243-3342"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.93.172:6379",
-          "created_at": 1753307115,
-          "id": "o3hWcdC8FXCPJA9fiLECKSVSAmzEKdQuKi3dUIGb",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "3833-3947",
-        "4371-4511",
-        "4935-5036"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.95.12:6379",
-          "created_at": 1753307256,
-          "id": "5lhB9LSKwVk1ie0dswnPTgb7bFcAbVMfAQecohx0",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "5499-5639",
-        "6063-6203",
-        "6627-6728"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.92.72:6379",
-          "created_at": 1753307272,
-          "id": "07vzQXoIXyYC3hST8xkQGc4XjKb0quZfZazI8dFj",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "7191-7331",
-        "7755-7895",
-        "8319-8420"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.69.15:6379",
-          "created_at": 1753307286,
-          "id": "tRiA04GRsEGGndUityvmvQOQmCLwKELDlHt1j9kP",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "8883-9023",
-        "9447-9587",
-        "10011-10112"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.88.118:6379",
-          "created_at": 1753307297,
-          "id": "IdSNJ5oKutd3za127sHy4eojfu77sm9797YL67Tb",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "10575-10715",
-        "11139-11279",
-        "11703-11804"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.95.118:6379",
-          "created_at": 1753307305,
-          "id": "F6fJJ7dK9FZRpLkkMHKQW1178yDW5rJYPINF60is",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "12267-12407",
-        "12831-12971",
-        "13395-13496"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.66.157:6379",
-          "created_at": 1753307313,
-          "id": "ejr9jJ0nrjzlblxSpRAsI3Xln6trdWasaKK10HkI",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "13959-14099",
-        "14523-14663",
-        "15087-15188"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.84.92:6379",
-          "created_at": 1753307327,
-          "id": "Co4TmXl00BfAefEhLx8HTb905iUY3dFOn0O2xVkw",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "3807-3832",
-        "5076-5101",
-        "10152-10177",
-        "10716-10741",
-        "15651-15791",
-        "16230-16344"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.94.91:6379",
-          "created_at": 1758300372,
-          "id": "Vb8qU9iXeAnuRUR7WhVp0vvMArZpO47QgSoO08JB",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "383-422",
-        "948-986",
-        "1512-1550",
-        "2076-2114",
-        "2640-2678",
-        "3204-3242",
-        "3768-3806",
-        "4332-4370",
-        "4896-4934",
-        "5460-5498"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.66.125:6379",
-          "created_at": 1758403399,
-          "id": "oI1fgCtbOky33iBcN9ko36pZHcsdi2QEBTh546LB",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "6022-6062",
-        "6588-6626",
-        "7152-7190",
-        "7716-7754",
-        "8280-8318",
-        "8844-8882",
-        "9408-9446",
-        "9972-10010",
-        "10536-10574",
-        "11100-11138"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.85.81:6379",
-          "created_at": 1758403429,
-          "id": "Vo1o6NYHAEyYVlgIqTq8O7msnBieYDSk99payPs4",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "11662-11702",
-        "12228-12266",
-        "12792-12830",
-        "13356-13394",
-        "13920-13958",
-        "14484-14522",
-        "15048-15086",
-        "15612-15650",
-        "16191-16229"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.95.9:6379",
-          "created_at": 1758403438,
-          "id": "JPurQbrFcDUaULqDQsvExCI0gEB9WKipZ6gYl5Jf",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "1653-1691",
-        "3343-3383",
-        "5037-5075",
-        "6729-6767",
-        "8421-8459",
-        "10113-10151",
-        "11805-11843",
-        "13497-13535",
-        "15189-15227",
-        "16345-16383"
-      ],
-      "target_shard_index": -1,
-      "migrating_slot": null
-    },
-    {
-      "nodes": [
-        {
-          "addr": "172.30.84.230:6379",
-          "created_at": 1762971251,
-          "id": "YMbEofmkD0JyNlBtyXi33uwZJSYZPU6v0FMvDkKL",
-          "password": "",
-          "role": "master"
-        }
-      ],
-      "slot_ranges": [
-        "16172-16190"
-      ],
+      "slot_ranges": [],
       "target_shard_index": -1,
       "migrating_slot": null
     }
   ],
   "migration_queue": {
-    "queue": []
+    "queue": null
   }
 }

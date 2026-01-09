@@ -63,6 +63,11 @@ func main() {
 	outputJSON := flag.Bool("json", false, "Output as JSON instead of commands")
 	namespace := flag.String("namespace", "default", "Namespace for kvctl commands")
 	cluster := flag.String("cluster", "", "Cluster name for kvctl commands")
+	redisStyle := flag.Bool(
+		"redis-style",
+		false,
+		"Use Redis-style proportional rebalancing (spreads migration load across all shards)",
+	)
 	flag.Parse()
 
 	var data []byte
@@ -88,7 +93,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	plan := calculateBalancePlan(&clusterData)
+	plan := calculateBalancePlan(&clusterData, *redisStyle)
 
 	if *outputJSON {
 		output, _ := json.MarshalIndent(plan, "", "  ")
@@ -106,7 +111,7 @@ func countSlots(slotRanges []store.SlotRange) int {
 	return count
 }
 
-func calculateBalancePlan(cluster *store.Cluster) *BalancePlan {
+func calculateBalancePlan(cluster *store.Cluster, redisStyle bool) *BalancePlan {
 	numShards := len(cluster.Shards)
 	if numShards == 0 {
 		return &BalancePlan{}
@@ -139,8 +144,13 @@ func calculateBalancePlan(cluster *store.Cluster) *BalancePlan {
 		}
 	}
 
-	// Generate migrations
-	migrations := generateMigrations(cluster, shardInfos)
+	// Generate migrations using selected algorithm
+	var migrations []Migration
+	if redisStyle {
+		migrations = generateMigrationsRedisStyle(cluster, shardInfos)
+	} else {
+		migrations = generateMigrations(cluster, shardInfos)
+	}
 
 	// Batch migrations for concurrency
 	batches := batchMigrations(migrations)
@@ -248,6 +258,195 @@ func generateMigrations(cluster *store.Cluster, shardInfos []shardSlotInfo) []Mi
 
 			giverRemaining[giverIdx] -= toTransfer
 			receiverRemaining[receiverIdx] -= toTransfer
+		}
+	}
+
+	return migrations
+}
+
+// generateMigrationsRedisStyle implements Redis-style proportional rebalancing.
+// Unlike the greedy algorithm that drains one giver at a time, this algorithm
+// distributes the migration load proportionally across ALL givers for each receiver.
+// This results in more migration operations but spreads the traffic more evenly.
+func generateMigrationsRedisStyle(
+	cluster *store.Cluster,
+	shardInfos []shardSlotInfo,
+) []Migration {
+	var migrations []Migration
+
+	// Separate into givers (positive delta) and receivers (negative delta)
+	var givers, receivers []shardSlotInfo
+	for _, info := range shardInfos {
+		if info.delta > 0 {
+			givers = append(givers, info)
+		} else if info.delta < 0 {
+			receivers = append(receivers, info)
+		}
+	}
+
+	if len(givers) == 0 || len(receivers) == 0 {
+		return migrations
+	}
+
+	// Sort givers by delta descending (most overage first)
+	sort.Slice(givers, func(i, j int) bool {
+		return givers[i].delta > givers[j].delta
+	})
+
+	// Sort receivers by delta ascending (most shortage first)
+	sort.Slice(receivers, func(i, j int) bool {
+		return receivers[i].delta < receivers[j].delta
+	})
+
+	// Build slot lists for each giver (reversed, take from end)
+	giverSlots := make(map[int][]int)
+	giverSlotIdx := make(map[int]int)
+	for _, g := range givers {
+		shard := cluster.Shards[g.index]
+		var allSlots []int
+		for _, sr := range shard.SlotRanges {
+			for s := sr.Start; s <= sr.Stop; s++ {
+				allSlots = append(allSlots, s)
+			}
+		}
+		// Reverse to take from end
+		for i, j := 0, len(allSlots)-1; i < j; i, j = i+1, j-1 {
+			allSlots[i], allSlots[j] = allSlots[j], allSlots[i]
+		}
+		giverSlots[g.index] = allSlots
+		giverSlotIdx[g.index] = 0
+	}
+
+	// Track remaining capacity
+	giverRemaining := make(map[int]int)
+	receiverRemaining := make(map[int]int)
+	for _, g := range givers {
+		giverRemaining[g.index] = g.delta
+	}
+	for _, r := range receivers {
+		receiverRemaining[r.index] = -r.delta
+	}
+
+	// Calculate total slots to give and receive
+	totalToGive := 0
+	for _, g := range givers {
+		totalToGive += g.delta
+	}
+
+	// For each receiver, take proportionally from all givers
+	for _, receiver := range receivers {
+		receiverIdx := receiver.index
+		needed := receiverRemaining[receiverIdx]
+		if needed <= 0 {
+			continue
+		}
+
+		// Calculate how many slots to take from each giver proportionally
+		for _, giver := range givers {
+			giverIdx := giver.index
+			if giverRemaining[giverIdx] <= 0 {
+				continue
+			}
+			if receiverRemaining[receiverIdx] <= 0 {
+				break
+			}
+
+			// Proportional share: (giver's remaining / total remaining) * needed
+			// But we cap at what the giver can give and receiver needs
+			totalGiverRemaining := 0
+			for _, g := range givers {
+				totalGiverRemaining += giverRemaining[g.index]
+			}
+			if totalGiverRemaining == 0 {
+				break
+			}
+
+			// Calculate proportional amount (round up to ensure we don't under-allocate)
+			proportionalAmt := (giverRemaining[giverIdx] * needed) / totalGiverRemaining
+			if proportionalAmt == 0 && giverRemaining[giverIdx] > 0 {
+				proportionalAmt = 1 // At least 1 slot if giver has capacity
+			}
+
+			toTransfer := min(
+				proportionalAmt,
+				min(giverRemaining[giverIdx], receiverRemaining[receiverIdx]),
+			)
+			if toTransfer <= 0 {
+				continue
+			}
+
+			// Get slots from this giver
+			slots := giverSlots[giverIdx]
+			startIdx := giverSlotIdx[giverIdx]
+			endIdx := startIdx + toTransfer
+			if endIdx > len(slots) {
+				endIdx = len(slots)
+				toTransfer = endIdx - startIdx
+			}
+			if toTransfer <= 0 {
+				continue
+			}
+
+			slotsToTransfer := slots[startIdx:endIdx]
+			giverSlotIdx[giverIdx] = endIdx
+
+			// Group into contiguous ranges
+			ranges := groupIntoRanges(slotsToTransfer)
+			for _, sr := range ranges {
+				migrations = append(migrations, Migration{
+					SourceShard: giverIdx,
+					TargetShard: receiverIdx,
+					Slots:       sr,
+				})
+			}
+
+			giverRemaining[giverIdx] -= toTransfer
+			receiverRemaining[receiverIdx] -= toTransfer
+		}
+
+		// Handle any remaining slots needed due to rounding
+		for receiverRemaining[receiverIdx] > 0 {
+			transferred := false
+			for _, giver := range givers {
+				giverIdx := giver.index
+				if giverRemaining[giverIdx] <= 0 {
+					continue
+				}
+				if receiverRemaining[receiverIdx] <= 0 {
+					break
+				}
+
+				toTransfer := min(giverRemaining[giverIdx], receiverRemaining[receiverIdx])
+				slots := giverSlots[giverIdx]
+				startIdx := giverSlotIdx[giverIdx]
+				endIdx := startIdx + toTransfer
+				if endIdx > len(slots) {
+					endIdx = len(slots)
+					toTransfer = endIdx - startIdx
+				}
+				if toTransfer <= 0 {
+					continue
+				}
+
+				slotsToTransfer := slots[startIdx:endIdx]
+				giverSlotIdx[giverIdx] = endIdx
+
+				ranges := groupIntoRanges(slotsToTransfer)
+				for _, sr := range ranges {
+					migrations = append(migrations, Migration{
+						SourceShard: giverIdx,
+						TargetShard: receiverIdx,
+						Slots:       sr,
+					})
+				}
+
+				giverRemaining[giverIdx] -= toTransfer
+				receiverRemaining[receiverIdx] -= toTransfer
+				transferred = true
+			}
+			if !transferred {
+				break // No more givers with capacity
+			}
 		}
 	}
 

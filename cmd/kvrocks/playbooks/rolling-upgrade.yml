@@ -1,0 +1,55 @@
+---
+# Usage: ansible-playbook -i ../ansible-load-nodes.ini rolling-upgrade.yml
+# Or from parent directory: ansible-playbook -i ansible-load-nodes.ini playbooks/rolling-upgrade.yml
+# Note: Run copy-binary.yml first to upload binaries to all nodes in parallel
+- name: Rolling upgrade kvrocks with binary and dev-ops update
+  hosts: nodes
+  become: true
+  serial: 5 # Five hosts at a time
+  vars:
+    binary_src: "/home/ec2-user/kvrocks-2.14.0"
+    binary_dest: "/usr/bin/kvrocks"
+    pause_seconds: 10 # Delay between nodes (adjust as needed)
+
+  tasks:
+    - name: Upgrade system to AL2023 release version
+      ansible.builtin.dnf:
+        name: "*"
+        state: latest
+        releasever: "2023.10.20260105"
+
+    - name: Fetch latest from origin
+      ansible.builtin.shell: |
+        cd ~/dev-ops && git fetch origin
+      become: false
+
+    - name: Checkout master and pull latest
+      ansible.builtin.shell: |
+        cd ~/dev-ops && git checkout master && git pull origin master
+      become: false
+
+    - name: Stop kvrocks service
+      ansible.builtin.systemd:
+        name: kvrocks
+        state: stopped
+
+    - name: Copy kvrocks binary from staging to /usr/bin
+      ansible.builtin.copy:
+        src: "{{ binary_src }}"
+        dest: "{{ binary_dest }}"
+        remote_src: true
+        mode: "0755"
+        owner: ec2-user
+        group: ec2-user
+        backup: true
+
+    - name: Start kvrocks service
+      ansible.builtin.systemd:
+        name: kvrocks
+        state: started
+        enabled: true
+
+    - name: Pause before next host
+      ansible.builtin.pause:
+        seconds: "{{ pause_seconds }}"
+      when: inventory_hostname != ansible_play_hosts_all[-1] # Skip pause on last host
