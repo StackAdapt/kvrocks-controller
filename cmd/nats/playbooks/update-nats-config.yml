@@ -1,0 +1,27 @@
+---
+# Usage: ansible-playbook -i ../ansible-load-nodes.ini update-nats-config.yml
+- name: Update NATS config from dev-ops repo
+  hosts: load_nodes
+  become: true
+  serial: 1
+  tasks:
+    - name: Fetch origin in dev-ops repo
+      ansible.builtin.command:
+        cmd: git fetch origin
+        chdir: /home/ec2-user/dev-ops
+      become_user: ec2-user
+
+    - name: Reset to origin/master
+      ansible.builtin.command:
+        cmd: git reset --hard origin/master
+        chdir: /home/ec2-user/dev-ops
+      become_user: ec2-user
+
+    - name: Restart NATS service
+      ansible.builtin.systemd:
+        name: nats
+        state: restarted
+
+    - name: Wait 30 seconds after restart
+      ansible.builtin.pause:
+        seconds: 30
